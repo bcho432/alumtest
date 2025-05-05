@@ -27,7 +27,7 @@ export default function SignUpPage() {
     setError(null);
 
     try {
-      const { user } = await signUp(formData.email, formData.password);
+      const { user } = await signUp(formData.email, formData.password, formData.organization);
       if (!user) throw new Error('User creation failed');
 
       // Create organization

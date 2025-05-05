@@ -10,6 +10,7 @@ export default function MemorialSignUpPage() {
     email: '',
     password: '',
     confirmPassword: '',
+    organizationName: 'Personal Account',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,7 +43,7 @@ export default function MemorialSignUpPage() {
     setLoading(true);
 
     try {
-      await signUp(formData.email, formData.password);
+      await signUp(formData.email, formData.password, formData.organizationName);
       router.push('/memorial/dashboard');
     } catch (err) {
       setError('Failed to create account. Please try again.');
@@ -121,6 +122,23 @@ export default function MemorialSignUpPage() {
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="organizationName" className="block text-sm font-medium text-gray-700">
+                Organization Name (Optional)
+              </label>
+              <div className="mt-1">
+                <input
+                  id="organizationName"
+                  name="organizationName"
+                  type="text"
+                  value={formData.organizationName}
+                  onChange={handleChange}
+                  className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                  placeholder="Personal Account"
                 />
               </div>
             </div>
