@@ -680,16 +680,18 @@ export default function MemorialPage() {
             </button>
             
             <div className="relative">
-              <img
-                src={memorial.photos[currentPhotoIndex].url}
-                alt={memorial.photos[currentPhotoIndex].caption || 'Memorial photo'}
-                className="max-h-[90vh] max-w-[90vw] object-contain"
-              />
+              {memorial.photos[currentPhotoIndex] && (
+                <img
+                  src={memorial.photos[currentPhotoIndex].url}
+                  alt={memorial.photos[currentPhotoIndex].caption || 'Memorial photo'}
+                  className="max-h-[90vh] max-w-[90vw] object-contain"
+                />
+              )}
               
-              {memorial.photos.length > 1 && (
+              {memorial.photos && memorial.photos.length > 1 && (
                 <>
                   <button
-                    onClick={() => handlePhotoIndexChange((currentPhotoIndex - 1 + memorial.photos.length) % memorial.photos.length)}
+                    onClick={() => handlePhotoIndexChange((currentPhotoIndex - 1 + (memorial.photos?.length || 0)) % (memorial.photos?.length || 1))}
                     className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 rounded-full p-3 text-white hover:bg-opacity-70 focus:outline-none"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -697,7 +699,7 @@ export default function MemorialPage() {
                     </svg>
                   </button>
                   <button
-                    onClick={() => handlePhotoIndexChange((currentPhotoIndex + 1) % memorial.photos.length)}
+                    onClick={() => handlePhotoIndexChange((currentPhotoIndex + 1) % (memorial.photos?.length || 1))}
                     className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 rounded-full p-3 text-white hover:bg-opacity-70 focus:outline-none"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -708,7 +710,7 @@ export default function MemorialPage() {
               )}
             </div>
             
-            {memorial.photos[currentPhotoIndex].caption && (
+            {memorial.photos && memorial.photos[currentPhotoIndex]?.caption && (
               <div className="absolute bottom-10 left-0 right-0 text-center">
                 <p className="text-white text-lg px-4 py-2 bg-black bg-opacity-50 inline-block rounded-lg">
                   {memorial.photos[currentPhotoIndex].caption}
