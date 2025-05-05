@@ -12,7 +12,7 @@ import type { SignUpFormData } from '@/types/forms';
 
 export default function SignUpPage() {
   const router = useRouter();
-  const { signUp } = useAuth();
+  const { signUp, user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<SignUpFormData>({
@@ -27,18 +27,32 @@ export default function SignUpPage() {
     setError(null);
 
     try {
-      const { user } = await signUp(formData.email, formData.password, formData.organization);
-      if (!user) throw new Error('User creation failed');
+      // signUp doesn't return a user object, it updates the auth context
+      await signUp(formData.email, formData.password, formData.organization);
+      
+      // Wait a moment for the auth state to update
+      setTimeout(async () => {
+        // Get the current user from auth context
+        if (!user) {
+          setError('User creation failed');
+          setIsLoading(false);
+          return;
+        }
 
-      // Create organization
-      const org = await createOrganization(user.uid, {
-        name: formData.organization,
-      });
+        try {
+          // Create organization
+          const org = await createOrganization(user.uid, {
+            name: formData.organization,
+          });
 
-      router.push(`/${org.id}/dashboard`);
+          router.push(`/${org.id}/dashboard`);
+        } catch (orgError) {
+          setError('Failed to create organization');
+          setIsLoading(false);
+        }
+      }, 1000);
     } catch (err) {
       setError(handleFirebaseError(err).message);
-    } finally {
       setIsLoading(false);
     }
   };
