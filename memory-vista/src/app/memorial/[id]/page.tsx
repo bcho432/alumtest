@@ -448,18 +448,20 @@ export default function MemorialPage() {
                       </div>
                       <div className="p-6">
                         <div className="relative aspect-w-16 aspect-h-9 rounded-lg overflow-hidden">
-                          <img
-                            src={memorial.photos[currentPhotoIndex].url}
-                            alt={memorial.photos[currentPhotoIndex].caption || 'Memorial photo'}
-                            className="object-cover w-full h-full cursor-pointer"
-                            onClick={handleFullscreenToggle}
-                          />
+                          {memorial.photos && memorial.photos[currentPhotoIndex] && (
+                            <img
+                              src={memorial.photos[currentPhotoIndex].url}
+                              alt={memorial.photos[currentPhotoIndex].caption || 'Memorial photo'}
+                              className="object-cover w-full h-full cursor-pointer"
+                              onClick={handleFullscreenToggle}
+                            />
+                          )}
                           
                           {/* Navigation arrows */}
-                          {memorial.photos.length > 1 && (
+                          {memorial.photos && memorial.photos.length > 1 && (
                             <>
                               <button
-                                onClick={() => handlePhotoIndexChange((currentPhotoIndex - 1 + memorial.photos.length) % memorial.photos.length)}
+                                onClick={() => handlePhotoIndexChange((currentPhotoIndex - 1 + (memorial.photos?.length || 0)) % (memorial.photos?.length || 1))}
                                 className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 rounded-full p-2 text-white hover:bg-opacity-70 focus:outline-none"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -467,7 +469,7 @@ export default function MemorialPage() {
                                 </svg>
                               </button>
                               <button
-                                onClick={() => handlePhotoIndexChange((currentPhotoIndex + 1) % memorial.photos.length)}
+                                onClick={() => handlePhotoIndexChange((currentPhotoIndex + 1) % (memorial.photos?.length || 1))}
                                 className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 rounded-full p-2 text-white hover:bg-opacity-70 focus:outline-none"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -478,16 +480,16 @@ export default function MemorialPage() {
                           )}
                         </div>
                         
-                        {memorial.photos[currentPhotoIndex].caption && (
+                        {memorial.photos && memorial.photos[currentPhotoIndex]?.caption && (
                           <p className="mt-2 text-center text-gray-600 italic">
                             {memorial.photos[currentPhotoIndex].caption}
                           </p>
                         )}
                         
                         {/* Thumbnail navigation */}
-                        {memorial.photos.length > 1 && (
+                        {memorial.photos && memorial.photos.length > 1 && (
                           <div className="mt-4 flex space-x-2 overflow-x-auto pb-2">
-                            {memorial.photos.map((photo, index) => (
+                            {memorial.photos?.map((photo, index) => (
                               <button
                                 key={index}
                                 onClick={() => handlePhotoIndexChange(index)}
