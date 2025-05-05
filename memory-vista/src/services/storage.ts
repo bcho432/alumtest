@@ -1,4 +1,4 @@
-import { storage } from '@/lib/firebase';
+import { getStorage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -32,6 +32,7 @@ export const uploadPhoto = async (
     throw new Error(error);
   }
 
+  const storage = getStorage();
   const timestamp = Date.now();
   const fileName = `${memorialId}/${userId}_${timestamp}_${file.name}`;
   const storageRef = ref(storage, `memorials/${fileName}`);
@@ -53,6 +54,7 @@ export const uploadPhoto = async (
 
 export const deletePhoto = async (url: string): Promise<void> => {
   try {
+    const storage = getStorage();
     const storageRef = ref(storage, url);
     await deleteObject(storageRef);
   } catch (error) {
