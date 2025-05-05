@@ -24,13 +24,9 @@ export default function LifeStoryPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Redirect if not authenticated or no memorialId
-  if (!user || !memorialId) {
-    router.push('/university');
-    return null;
-  }
-
   useEffect(() => {
+    if (!memorialId) return;
+    
     const loadMemorial = async () => {
       try {
         const memorial = await getMemorial(memorialId);
@@ -44,6 +40,12 @@ export default function LifeStoryPage() {
 
     loadMemorial();
   }, [memorialId]);
+
+  // Redirect if not authenticated or no memorialId
+  if (!user || !memorialId) {
+    router.push('/university');
+    return null;
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const { name, value } = e.target;

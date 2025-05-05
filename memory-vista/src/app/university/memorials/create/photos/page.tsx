@@ -38,13 +38,9 @@ export default function PhotosPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadTasksRef = useRef<Map<string, UploadTask>>(new Map());
 
-  // Redirect if not authenticated or no memorialId
-  if (!user || !memorialId) {
-    router.push('/university');
-    return null;
-  }
-
   useEffect(() => {
+    if (!memorialId) return;
+    
     const loadMemorial = async () => {
       try {
         const memorial = await getMemorial(memorialId);
@@ -76,7 +72,10 @@ export default function PhotosPage() {
           URL.revokeObjectURL(photo.preview);
         }
       });
-      uploadTasksRef.current.forEach(task => task.cancel());
+      
+      // Store the reference to upload tasks in a local variable
+      const currentTasks = uploadTasksRef.current;
+      currentTasks.forEach(task => task.cancel());
     };
   }, [photos]);
 
@@ -92,6 +91,12 @@ export default function PhotosPage() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
+
+  // Redirect if not authenticated or no memorialId
+  if (!user || !memorialId) {
+    router.push('/university');
+    return null;
+  }
 
   const validateFile = (file: File): string | null => {
     if (!ALLOWED_TYPES.includes(file.type)) {

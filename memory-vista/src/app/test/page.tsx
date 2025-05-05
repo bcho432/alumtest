@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { auth, db } from '@/lib/firebase';
+import { getAuth, getDb } from '@/lib/firebase';
 import { collection, addDoc, getDocs } from 'firebase/firestore';
 
 export default function TestPage() {
@@ -11,6 +11,9 @@ export default function TestPage() {
   useEffect(() => {
     async function testFirebase() {
       try {
+        const auth = getAuth();
+        const db = getDb();
+        
         // Test Firestore
         const testCollection = collection(db, 'test');
         await addDoc(testCollection, { timestamp: new Date() });
