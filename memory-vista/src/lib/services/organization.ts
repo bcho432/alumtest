@@ -32,6 +32,7 @@ export async function createOrganization(
 
 export async function getOrganization(orgId: string): Promise<Organization> {
   try {
+    const db = getDb();
     const orgRef = doc(db, 'organizations', orgId);
     const orgDoc = await getDoc(orgRef);
 
