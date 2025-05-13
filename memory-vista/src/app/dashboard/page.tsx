@@ -10,6 +10,7 @@ import { getMemorial, Memorial } from '@/services/memorials';
 import { UserUniversityAssociation } from '@/types';
 import { doc, query, where, collection, getDocs, getDoc, DocumentData } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
+import { User } from 'firebase/auth';
 
 export default function UserDashboardPage() {
   return (
@@ -56,142 +57,8 @@ function UserDashboardContent() {
         setUniversities(universityData);
         console.log('Universities data loaded:', universityData);
         
-        // Get memorials using multiple strategies
-        const memorialsData: {[key: string]: Memorial[]} = {};
-        
-        // STRATEGY 1: Direct approach: Get ALL memorials first for debugging
-        const allMemorialsRef = collection(db, 'memorials');
-        const allQuerySnapshot = await getDocs(allMemorialsRef);
-        console.log('ALL memorials in system:', allQuerySnapshot.size);
-        
-        // Log each memorial to debug
-        allQuerySnapshot.forEach(doc => {
-          const data = doc.data();
-          console.log(`Memorial ${doc.id}:`, {
-            creator: data.creatorId,
-            creator_type: typeof data.creatorId,
-            university: data.universityId,
-            name: data.basicInfo?.name,
-            status: data.status
-          });
-        });
-        
-        // Helper function to add memorial to results if not already present
-        const addMemorialToResults = (memorial: Memorial) => {
-          const uniId = memorial.universityId;
-          if (!memorialsData[uniId]) {
-            memorialsData[uniId] = [];
-          }
-          
-          // Check if already added to avoid duplicates
-          if (!memorialsData[uniId].some(m => m.id === memorial.id)) {
-            memorialsData[uniId].push(memorial);
-          }
-        };
-        
-        // STRATEGY 2: Get memorials created by user (string comparison)
-        const memorialsRef = collection(db, 'memorials');
-        console.log('Querying memorials where creatorId ==', String(user.uid));
-        const creatorQuery = query(memorialsRef, where('creatorId', '==', String(user.uid)));
-        const creatorQuerySnapshot = await getDocs(creatorQuery);
-        console.log('Memorials where user is creator (string match):', creatorQuerySnapshot.size);
-        
-        creatorQuerySnapshot.forEach((doc) => {
-          const docData = doc.data();
-          const memorial = {
-            id: doc.id,
-            ...docData,
-            // Ensure dates are properly handled
-            createdAt: docData.createdAt ? new Date(docData.createdAt) : new Date(),
-            updatedAt: docData.updatedAt ? new Date(docData.updatedAt) : new Date()
-          } as Memorial;
-          
-          addMemorialToResults(memorial);
-        });
-                
-        // STRATEGY 3: Also check for memorials where the user is listed as a collaborator
-        const collaboratorQuery = query(
-          collection(db, 'memorials'), 
-          where('collaboratorIds', 'array-contains', String(user.uid))
-        );
-        
-        const collaboratorSnapshot = await getDocs(collaboratorQuery);
-        console.log('Memorials where user is collaborator:', collaboratorSnapshot.size);
-        
-        collaboratorSnapshot.forEach((doc) => {
-          const docData = doc.data();
-          const memorial = {
-            id: doc.id,
-            ...docData,
-            // Ensure dates are properly handled
-            createdAt: docData.createdAt ? new Date(docData.createdAt) : new Date(),
-            updatedAt: docData.updatedAt ? new Date(docData.updatedAt) : new Date()
-          } as Memorial;
-          
-          addMemorialToResults(memorial);
-        });
-        
-        // STRATEGY 4: For each university association, check if there are memorials linked to it
-        for (const assoc of userAssociations) {
-          if (assoc.memorialIds && assoc.memorialIds.length > 0) {
-            console.log(`Association ${assoc.id} has linked memorials:`, assoc.memorialIds);
-            
-            // Fetch each memorial by ID
-            for (const memorialId of assoc.memorialIds) {
-              try {
-                const memorialDoc = await getDoc(doc(db, 'memorials', memorialId));
-                if (memorialDoc.exists()) {
-                  const docData = memorialDoc.data();
-                  const memorial = {
-                    id: memorialDoc.id,
-                    ...docData,
-                    // Ensure dates are properly handled
-                    createdAt: docData.createdAt ? new Date(docData.createdAt) : new Date(),
-                    updatedAt: docData.updatedAt ? new Date(docData.updatedAt) : new Date()
-                  } as Memorial;
-                  
-                  addMemorialToResults(memorial);
-                }
-              } catch (err) {
-                console.error(`Error loading association memorial ${memorialId}:`, err);
-              }
-            }
-          }
-        }
-        
-        // STRATEGY 5: Manual search through all memorials if we didn't find any
-        if (Object.keys(memorialsData).length === 0) {
-          console.log('No memorials found with standard queries. Trying manual search...');
-          
-          // Try different formats of user.uid for comparison
-          const userIdVariations = [
-            user.uid,
-            String(user.uid),
-            user.uid.toString()
-          ];
-          
-          // Find any memorial with this user as creator in any format
-          const foundMemorials = allQuerySnapshot.docs.filter(doc => {
-            const creatorId = doc.data().creatorId;
-            return userIdVariations.some(idVariation => creatorId === idVariation);
-          });
-          
-          console.log('Manual check found memorials:', foundMemorials.length);
-          
-          foundMemorials.forEach(doc => {
-            console.log('Manual found memorial:', doc.id, doc.data());
-            const docData = doc.data();
-            const memorial = {
-              id: doc.id,
-              ...docData,
-              // Ensure dates are properly handled
-              createdAt: docData.createdAt ? new Date(docData.createdAt) : new Date(),
-              updatedAt: docData.updatedAt ? new Date(docData.updatedAt) : new Date()
-            } as Memorial;
-            
-            addMemorialToResults(memorial);
-          });
-        }
+        // Get memorials for the user
+        const memorialsData = await getMemorialsForUser(user, userAssociations);
         
         // Log all the user-related memorials by university
         console.log('All memorials data:', memorialsData);
@@ -385,4 +252,75 @@ function UserDashboardContent() {
       </main>
     </div>
   );
-} 
+}
+
+// Get memorials for the user
+const getMemorialsForUser = async (user: User, userAssociations: any[]) => {
+  try {
+    const db = getDb();
+    const memorialsRef = collection(db, 'memorials');
+    
+    // Simple query: get memorials where user is creator (using string ID)
+    const creatorQuery = query(
+      memorialsRef,
+      where('creatorId', '==', String(user.uid))
+    );
+    
+    const querySnapshot = await getDocs(creatorQuery);
+    console.log('Found memorials:', querySnapshot.size);
+    
+    // Organize memorials by university
+    const memorialsData: {[key: string]: Memorial[]} = {};
+    
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      const memorial = {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+        updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date()
+      } as Memorial;
+      
+      const uniId = memorial.universityId;
+      if (!memorialsData[uniId]) {
+        memorialsData[uniId] = [];
+      }
+      memorialsData[uniId].push(memorial);
+    });
+    
+    // Also check university associations for any additional memorials
+    for (const assoc of userAssociations) {
+      if (assoc.memorialIds?.length) {
+        for (const memorialId of assoc.memorialIds) {
+          try {
+            const memorialDoc = await getDoc(doc(db, 'memorials', memorialId));
+            if (memorialDoc.exists()) {
+              const data = memorialDoc.data();
+              const memorial = {
+                id: memorialDoc.id,
+                ...data,
+                createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+                updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date()
+              } as Memorial;
+              
+              const uniId = memorial.universityId;
+              if (!memorialsData[uniId]) {
+                memorialsData[uniId] = [];
+              }
+              if (!memorialsData[uniId].some(m => m.id === memorial.id)) {
+                memorialsData[uniId].push(memorial);
+              }
+            }
+          } catch (err) {
+            console.error(`Error fetching memorial ${memorialId}:`, err);
+          }
+        }
+      }
+    }
+    
+    return memorialsData;
+  } catch (error) {
+    console.error('Error fetching memorials:', error);
+    throw error;
+  }
+}; 
