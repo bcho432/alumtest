@@ -72,7 +72,10 @@ export async function getInvitationByToken(token: string): Promise<MemorialInvit
     const db = getDb();
     const invitationsCollection = collection(db, 'invitations');
     const q = query(invitationsCollection, where('token', '==', token));
+    
+    console.log('Attempting to execute Firestore query');
     const querySnapshot = await getDocs(q);
+    console.log('Query executed successfully');
     
     if (querySnapshot.empty) {
       console.log('No invitation found with token:', token);
@@ -122,10 +125,18 @@ export async function getInvitationByToken(token: string): Promise<MemorialInvit
     return invitation;
   } catch (error) {
     console.error('Error getting invitation by token:', error);
+    // Log specific Firebase errors
     if (error instanceof Error) {
-      throw new Error(`Failed to get invitation: ${error.message}`);
+      console.error('Error type:', error.name);
+      console.error('Error message:', error.message);
+      
+      // Check for Firebase permission errors
+      if (error.name === 'FirebaseError' && error.message.includes('permission')) {
+        console.error('Firebase permissions error detected. Check Firestore security rules.');
+      }
     }
-    throw new Error('Failed to get invitation');
+    
+    throw error;
   }
 }
 

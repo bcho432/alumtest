@@ -282,7 +282,7 @@ export default function UniversityDashboard() {
                   <button
                     type="button"
                     onClick={() => {
-                      console.log('Redirecting to invitations page');
+                      console.log('Showing invitation UI');
                       setIsCreating(false);
                       setShowInviteUI(true);
                     }}
@@ -358,6 +358,10 @@ export default function UniversityDashboard() {
                           {inviteCopied ? 'Copied!' : 'Copy'}
                         </button>
                       </div>
+                      <p className="mt-3 text-sm">
+                        <strong>Note:</strong> The invitee will need to create an account or sign in to accept this invitation.
+                        They will then be able to create a memorial that will be linked to your university.
+                      </p>
                     </div>
                   </div>
                 )}

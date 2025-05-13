@@ -55,7 +55,15 @@ export default function AcceptInvitationPage() {
         setLoading(false);
       } catch (err) {
         console.error('Error loading invitation:', err);
-        setError('Error loading invitation. Please try again.');
+        let errorMessage = 'Error loading invitation. Please try again.';
+        
+        // Add more detailed error information for debugging
+        if (err instanceof Error) {
+          console.error('Error details:', err.message);
+          errorMessage = `Memorial Invitation Error: ${err.message}`;
+        }
+        
+        setError(errorMessage);
         setLoading(false);
       }
     }
