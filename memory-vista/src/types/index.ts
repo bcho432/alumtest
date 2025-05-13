@@ -45,4 +45,25 @@ export interface FamilyMember {
   relationship: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface MemorialInvitation {
+  id: string;
+  universityId: string;
+  token: string;
+  status: 'pending' | 'accepted' | 'expired';
+  email?: string;
+  createdAt: Date;
+  expiresAt: Date;
+  memorialId?: string;
+  acceptedBy?: string;
+}
+
+export interface UserUniversityAssociation {
+  id: string;
+  userId: string;
+  universityId: string;
+  role: 'admin' | 'contributor';
+  memorialIds: string[];
+  createdAt: Date;
 } 

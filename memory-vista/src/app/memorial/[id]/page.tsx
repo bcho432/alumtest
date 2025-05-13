@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { getMemorial } from '@/services/memorials';
 import { Memorial } from '@/services/memorials';
+import { isMemorialPublished, canEditMemorial } from '@/lib/permissions';
 import Link from 'next/link';
 import { Icon } from '@/components/ui/Icon';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -146,7 +147,45 @@ export default function MemorialPage() {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [isPublished, setIsPublished] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Check if memorial is published
+  useEffect(() => {
+    async function checkPublishStatus() {
+      if (!params.id) return;
+      
+      try {
+        const published = await isMemorialPublished(params.id as string);
+        setIsPublished(published);
+      } catch (err) {
+        console.error('Error checking published status:', err);
+      }
+    }
+    
+    checkPublishStatus();
+  }, [params.id]);
+  
+  // Check if user can edit memorial
+  useEffect(() => {
+    async function checkEditPermission() {
+      if (!params.id || !user) {
+        setCanEdit(false);
+        return;
+      }
+      
+      try {
+        const canEdit = await canEditMemorial(user.uid, params.id as string);
+        setCanEdit(canEdit);
+      } catch (err) {
+        console.error('Error checking edit permission:', err);
+        setCanEdit(false);
+      }
+    }
+    
+    checkEditPermission();
+  }, [params.id, user]);
 
   const loadMemorial = useCallback(async () => {
     if (abortControllerRef.current) {
@@ -157,6 +196,7 @@ export default function MemorialPage() {
     try {
       const data = await getMemorial(params.id as string);
       setMemorial(data);
+      setIsPublished(data.status === 'published');
       setError('');
       setRetryCount(0);
     } catch (err) {
@@ -182,6 +222,13 @@ export default function MemorialPage() {
       }
     };
   }, [loadMemorial]);
+
+  // Handle unauthorized access - redirect to login if not published and not authorized
+  useEffect(() => {
+    if (!loading && !isPublished && !canEdit && !user) {
+      router.push(`/login?redirectUrl=${encodeURIComponent(`/memorial/${params.id}`)}`);
+    }
+  }, [loading, isPublished, canEdit, user, router, params.id]);
 
   const handleLightCandle = useCallback(() => {
     // TODO: Implement candle lighting functionality

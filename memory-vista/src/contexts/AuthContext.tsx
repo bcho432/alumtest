@@ -11,36 +11,100 @@ import {
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { getAuth, getDb } from '@/lib/firebase';
 
+export interface UserRoles {
+  isUniversityAdmin: boolean;
+  universityAdminFor: string[]; // Array of university IDs
+}
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  userRoles: UserRoles | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, organizationName: string) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshUserRoles: () => Promise<void>;
 }
+
+const defaultUserRoles: UserRoles = {
+  isUniversityAdmin: false,
+  universityAdminFor: [],
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initializing, setInitializing] = useState(true);
+  const [userRoles, setUserRoles] = useState<UserRoles | null>(null);
 
+  // Load user roles when user changes
+  const loadUserRoles = async (user: User | null) => {
+    if (!user) {
+      setUserRoles(null);
+      return;
+    }
+
+    try {
+      const db = getDb();
+      
+      // Check if user is a university admin
+      const universityRef = doc(db, 'universities', user.uid);
+      const universityDoc = await getDoc(universityRef);
+      
+      const roles: UserRoles = {
+        isUniversityAdmin: universityDoc.exists(),
+        universityAdminFor: universityDoc.exists() ? [user.uid] : [],
+      };
+      
+      // In future: we could check other roles here
+      
+      setUserRoles(roles);
+    } catch (error) {
+      console.error('Error loading user roles:', error);
+      setUserRoles(defaultUserRoles);
+    }
+  };
+
+  // Refresh user roles (can be called after changes)
+  const refreshUserRoles = async () => {
+    await loadUserRoles(user);
+  };
+
+  // Handle initial auth state
   useEffect(() => {
     const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    setInitializing(true);
+    
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log('Auth state changed:', user?.uid);
       setUser(user);
+      
+      // Load user roles
+      await loadUserRoles(user);
+      
       setLoading(false);
+      setInitializing(false);
     });
 
     return () => unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const auth = getAuth();
-    await signInWithEmailAndPassword(auth, email, password);
+    setLoading(true);
+    try {
+      const auth = getAuth();
+      await signInWithEmailAndPassword(auth, email, password);
+      // Auth state change will trigger role loading
+    } catch (error) {
+      setLoading(false);
+      throw error;
+    }
   };
 
   const signUp = async (email: string, password: string, organizationName: string) => {
+    setLoading(true);
     console.log("Starting signup process:", { email, organizationName });
     const auth = getAuth();
     const db = getDb();
@@ -86,23 +150,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         exists: verifyDoc.exists(),
         data: verifyDoc.data()
       });
+      
+      // Update user roles
+      await refreshUserRoles();
     } catch (error) {
       console.error("Error in signup process:", {
         error,
         message: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined
       });
+      setLoading(false);
       throw error;
     }
   };
 
   const signOut = async () => {
-    const auth = getAuth();
-    await firebaseSignOut(auth);
+    setLoading(true);
+    try {
+      const auth = getAuth();
+      await firebaseSignOut(auth);
+      // Auth state change will update user state
+    } catch (error) {
+      setLoading(false);
+      throw error;
+    }
   };
 
+  // If we're initializing, show nothing
+  if (initializing) {
+    return null;
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      userRoles, 
+      signIn, 
+      signUp, 
+      signOut, 
+      refreshUserRoles 
+    }}>
       {children}
     </AuthContext.Provider>
   );

@@ -14,7 +14,7 @@ interface NavigationProps {
 
 export function Navigation({ orgId, orgName }: NavigationProps) {
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, userRoles, signOut } = useAuth();
 
   const handleSignOut = async () => {
     try {
@@ -35,28 +35,39 @@ export function Navigation({ orgId, orgName }: NavigationProps) {
                 Memory Vista
               </Link>
             </div>
-            {orgId && (
-              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+              <Link
+                href="/"
+                className="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700"
+              >
+                Home
+              </Link>
+              
+              {user && userRoles?.isUniversityAdmin && (
                 <Link
-                  href={`/${orgId}/dashboard`}
+                  href="/university/dashboard"
                   className="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700"
                 >
-                  Dashboard
+                  University
                 </Link>
+              )}
+              
+              {user && (
                 <Link
-                  href={`/${orgId}/profiles`}
+                  href="/dashboard"
                   className="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700"
                 >
-                  Profiles
+                  My Memorials
                 </Link>
-                <Link
-                  href={`/${orgId}/settings`}
-                  className="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                >
-                  Settings
-                </Link>
-              </div>
-            )}
+              )}
+              
+              <Link
+                href="/guide"
+                className="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700"
+              >
+                User Guide
+              </Link>
+            </div>
           </div>
           <div className="hidden sm:ml-6 sm:flex sm:items-center">
             {user ? (
@@ -81,6 +92,32 @@ export function Navigation({ orgId, orgName }: NavigationProps) {
                   leaveTo="transform opacity-0 scale-95"
                 >
                   <Menu.Items className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                    {userRoles?.isUniversityAdmin && (
+                      <Menu.Item>
+                        {({ active }) => (
+                          <Link
+                            href="/university/dashboard"
+                            className={`${
+                              active ? 'bg-gray-100' : ''
+                            } block px-4 py-2 text-sm text-gray-700`}
+                          >
+                            University Dashboard
+                          </Link>
+                        )}
+                      </Menu.Item>
+                    )}
+                    <Menu.Item>
+                      {({ active }) => (
+                        <Link
+                          href="/dashboard"
+                          className={`${
+                            active ? 'bg-gray-100' : ''
+                          } block px-4 py-2 text-sm text-gray-700`}
+                        >
+                          My Dashboard
+                        </Link>
+                      )}
+                    </Menu.Item>
                     <Menu.Item>
                       {({ active }) => (
                         <button

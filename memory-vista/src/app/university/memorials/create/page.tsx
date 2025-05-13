@@ -1,15 +1,25 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { createMemorial, MemorialBasicInfo } from '@/services/memorials';
-import { collection, addDoc, getFirestore } from 'firebase/firestore';
+import { collection, addDoc } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
 export default function CreateMemorialPage() {
+  return (
+    <ProtectedRoute>
+      <CreateMemorialContent />
+    </ProtectedRoute>
+  );
+}
+
+function CreateMemorialContent() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const searchParams = useSearchParams();
+  const { user } = useAuth();
   const [formData, setFormData] = useState<MemorialBasicInfo>({
     name: '',
     dateOfBirth: '',
@@ -19,51 +29,19 @@ export default function CreateMemorialPage() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // Check if this is an external user (with university invitation)
+  const isExternal = searchParams.get('external') === 'true';
+  const universityId = searchParams.get('universityId');
 
-  // Log authentication state for debugging
+  // Log parameters for debugging
   useEffect(() => {
-    console.log("Memorial create page - Auth state:", { 
-      authenticated: !!user, 
-      loading: authLoading,
+    console.log("Memorial create page - Parameters:", { 
+      isExternal, 
+      universityId,
       userId: user?.uid
     });
-  }, [user, authLoading]);
-
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!authLoading && !user) {
-      console.log("Not authenticated, redirecting to university page");
-      router.push('/university');
-    }
-  }, [user, authLoading, router]);
-
-  // Add a useEffect to test Firestore permissions
-  useEffect(() => {
-    if (user) {
-      console.log("Testing Firestore permissions...");
-      const testFirestore = async () => {
-        try {
-          // Try to write to a test collection (should have no restrictions)
-          const db = getDb();
-          const testDoc = await addDoc(collection(db, 'testCollection'), {
-            test: true,
-            userId: user.uid,
-            timestamp: new Date().toISOString()
-          });
-          console.log("Test document created successfully:", testDoc.id);
-        } catch (error) {
-          console.error("Failed to create test document:", error);
-        }
-      };
-      
-      testFirestore();
-    }
-  }, [user]);
-
-  if (authLoading || !user) {
-    console.log("Loading or no user, rendering nothing");
-    return null;
-  }
+  }, [isExternal, universityId, user]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -102,17 +80,39 @@ export default function CreateMemorialPage() {
     e.preventDefault();
     setError('');
 
-    if (!validateForm()) {
+    if (!validateForm() || !user) {
+      return;
+    }
+
+    // If external, we need a universityId
+    if (isExternal && !universityId) {
+      setError('Missing university information');
       return;
     }
 
     setLoading(true);
-    console.log("Submitting memorial form with userId:", user.uid);
+    console.log("Submitting memorial form with:", { 
+      userId: user.uid, 
+      isExternal, 
+      universityId: isExternal ? universityId : user.uid 
+    });
 
     try {
-      const memorial = await createMemorial(user.uid, formData);
+      // If external, use the universityId from the search params and set creatorId to the current user
+      // Otherwise, the current user's ID is both the universityId and creatorId
+      const uniId = isExternal ? universityId! : user.uid;
+      const creatorId = user.uid;
+
+      const memorial = await createMemorial(uniId, formData, isExternal ? creatorId : undefined);
       console.log("Memorial created successfully:", memorial);
-      router.push(`/university/memorials/create/life-story?memorialId=${memorial.id}`);
+      
+      // Add the appropriate parameters to the next page
+      let nextPageUrl = `/university/memorials/create/life-story?memorialId=${memorial.id}`;
+      if (isExternal) {
+        nextPageUrl += `&external=true&universityId=${uniId}`;
+      }
+      
+      router.push(nextPageUrl);
     } catch (err) {
       console.error("Error in handleSubmit:", err);
       setError('Failed to create memorial. Please try again.');
@@ -147,6 +147,23 @@ export default function CreateMemorialPage() {
             </div>
           </div>
         </div>
+
+        {isExternal && (
+          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-md p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3 flex-1 md:flex md:justify-between">
+                <p className="text-sm text-blue-700">
+                  You're creating a memorial on behalf of a university. Your memorial will need to be approved by the university administrator before it's published.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="bg-white shadow sm:rounded-lg">
           <div className="px-4 py-5 sm:p-6">
@@ -250,20 +267,13 @@ export default function CreateMemorialPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => router.back()}
-                  className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
+              <div className="flex justify-end">
                 <button
                   type="submit"
                   disabled={loading}
-                  className="inline-flex justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
                 >
-                  {loading ? 'Saving...' : 'Continue'}
+                  {loading ? 'Creating...' : 'Continue to Life Story'}
                 </button>
               </div>
             </form>

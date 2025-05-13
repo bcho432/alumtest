@@ -35,6 +35,9 @@ export interface Memorial {
   photos?: MemorialPhoto[];
   createdAt: Date;
   updatedAt: Date;
+  creatorId?: string;
+  collaboratorIds?: string[];
+  universityApproved?: boolean;
 }
 
 const validateBasicInfo = (basicInfo: MemorialBasicInfo): string | null => {
@@ -107,7 +110,7 @@ const validatePhotos = (photos: MemorialPhoto[]): string | null => {
   return null;
 };
 
-export const createMemorial = async (universityId: string, basicInfo: MemorialBasicInfo): Promise<Memorial> => {
+export const createMemorial = async (universityId: string, basicInfo: MemorialBasicInfo, creatorId?: string): Promise<Memorial> => {
   if (!universityId) {
     throw new Error('University ID is required');
   }
@@ -119,7 +122,7 @@ export const createMemorial = async (universityId: string, basicInfo: MemorialBa
   }
 
   try {
-    console.log("Starting simplified memorial creation with:", { universityId, basicInfo });
+    console.log("Starting simplified memorial creation with:", { universityId, basicInfo, creatorId });
     const db = getDb();
 
     // Skip university document check for now
@@ -133,11 +136,16 @@ export const createMemorial = async (universityId: string, basicInfo: MemorialBa
       basicInfo,
       createdAt: now,
       updatedAt: now,
+      // If a creatorId is provided, use it; otherwise default to universityId
+      creatorId: creatorId || universityId,
+      collaboratorIds: [],
+      universityApproved: creatorId ? false : true, // Auto-approve if university created it
     };
 
     console.log('Attempting to create memorial document:', {
       memorialId: memorialRef.id,
       universityId,
+      creatorId: memorial.creatorId,
       path: memorialRef.path
     });
 
