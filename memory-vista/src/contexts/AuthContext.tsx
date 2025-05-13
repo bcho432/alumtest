@@ -21,7 +21,7 @@ interface AuthContextType {
   loading: boolean;
   userRoles: UserRoles | null;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, organizationName: string) => Promise<void>;
+  signUp: (email: string, password: string, organizationName: string, isPersonalAccount?: boolean) => Promise<void>;
   signOut: () => Promise<void>;
   refreshUserRoles: () => Promise<void>;
 }
@@ -122,9 +122,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, organizationName: string) => {
+  const signUp = async (email: string, password: string, organizationName: string, isPersonalAccount: boolean = false) => {
     setLoading(true);
-    console.log("Starting signup process:", { email, organizationName });
+    console.log("Starting signup process:", { email, organizationName, isPersonalAccount });
     const auth = getAuth();
     const db = getDb();
     
@@ -146,29 +146,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       });
       
-      // Create university document
-      const universityRef = doc(db, 'universities', user.uid);
-      console.log("Creating university document:", { path: universityRef.path });
-      
-      const universityData = {
-        id: user.uid,
-        email: user.email,
-        name: organizationName,
-        adminIds: [user.uid],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      
-      console.log("University document data:", universityData);
-      await setDoc(universityRef, universityData);
-      console.log("University document created successfully");
-      
-      // Verify the document was created
-      const verifyDoc = await getDoc(universityRef);
-      console.log("University document verification:", { 
-        exists: verifyDoc.exists(),
-        data: verifyDoc.data()
-      });
+      // If this is a university account (not a personal account), create a university document
+      if (!isPersonalAccount) {
+        const universityRef = doc(db, 'universities', user.uid);
+        console.log("Creating university document:", { path: universityRef.path });
+        
+        const universityData = {
+          id: user.uid,
+          email: user.email,
+          name: organizationName,
+          adminIds: [user.uid],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        console.log("University document data:", universityData);
+        await setDoc(universityRef, universityData);
+        console.log("University document created successfully");
+        
+        // Verify the document was created
+        const verifyDoc = await getDoc(universityRef);
+        console.log("University document verification:", { 
+          exists: verifyDoc.exists(),
+          data: verifyDoc.data()
+        });
+      } else {
+        // For personal accounts, just log info
+        console.log("Created personal account for:", { uid: user.uid, email: user.email });
+      }
       
       // Update user roles
       await refreshUserRoles();

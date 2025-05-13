@@ -29,7 +29,9 @@ export default function AcceptInvitationPage() {
       }
       
       try {
+        console.log('Loading invitation with token:', token);
         const invitation = await getInvitationByToken(token);
+        console.log('Invitation data:', invitation);
         
         if (!invitation) {
           setError('Invitation not found or has expired.');
@@ -52,16 +54,14 @@ export default function AcceptInvitationPage() {
         setInvitation(invitation);
         setLoading(false);
       } catch (err) {
-        setError('Error loading invitation. Please try again.');
         console.error('Error loading invitation:', err);
+        setError('Error loading invitation. Please try again.');
         setLoading(false);
       }
     }
 
-    if (!authLoading) {
-      loadInvitation();
-    }
-  }, [token, authLoading]);
+    loadInvitation();
+  }, [token]);
 
   // Handle accepting invitation
   const handleAcceptInvitation = async () => {

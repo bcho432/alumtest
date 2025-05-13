@@ -68,44 +68,58 @@ export async function getInvitationByToken(token: string): Promise<MemorialInvit
   }
   
   try {
+    console.log('Getting invitation by token:', token);
     const db = getDb();
     const invitationsCollection = collection(db, 'invitations');
     const q = query(invitationsCollection, where('token', '==', token));
     const querySnapshot = await getDocs(q);
     
     if (querySnapshot.empty) {
+      console.log('No invitation found with token:', token);
       return null;
     }
     
     const doc = querySnapshot.docs[0];
     const data = doc.data();
+    console.log('Raw invitation data:', data);
     
-    // Handle date conversion
+    // Handle date conversion more robustly
     let createdAt = new Date();
     let expiresAt = new Date();
     
-    if (data.createdAt) {
-      if (typeof data.createdAt.toDate === 'function') {
-        createdAt = data.createdAt.toDate();
-      } else if (typeof data.createdAt === 'string') {
-        createdAt = new Date(data.createdAt);
+    try {
+      if (data.createdAt) {
+        if (typeof data.createdAt === 'object' && typeof data.createdAt.toDate === 'function') {
+          createdAt = data.createdAt.toDate();
+        } else if (typeof data.createdAt === 'string') {
+          createdAt = new Date(data.createdAt);
+        } else if (data.createdAt instanceof Date) {
+          createdAt = data.createdAt;
+        }
       }
+      
+      if (data.expiresAt) {
+        if (typeof data.expiresAt === 'object' && typeof data.expiresAt.toDate === 'function') {
+          expiresAt = data.expiresAt.toDate();
+        } else if (typeof data.expiresAt === 'string') {
+          expiresAt = new Date(data.expiresAt);
+        } else if (data.expiresAt instanceof Date) {
+          expiresAt = data.expiresAt;
+        }
+      }
+    } catch (dateError) {
+      console.error('Error parsing dates:', dateError);
     }
     
-    if (data.expiresAt) {
-      if (typeof data.expiresAt.toDate === 'function') {
-        expiresAt = data.expiresAt.toDate();
-      } else if (typeof data.expiresAt === 'string') {
-        expiresAt = new Date(data.expiresAt);
-      }
-    }
-    
-    return {
+    const invitation = {
       ...data,
       id: doc.id,
       createdAt,
       expiresAt,
     } as MemorialInvitation;
+    
+    console.log('Processed invitation:', invitation);
+    return invitation;
   } catch (error) {
     console.error('Error getting invitation by token:', error);
     if (error instanceof Error) {

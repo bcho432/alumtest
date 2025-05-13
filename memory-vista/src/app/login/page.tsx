@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/Input';
@@ -11,6 +11,7 @@ import type { SignInFormData } from '@/types/forms';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { signIn } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,6 +20,9 @@ export default function LoginPage() {
     password: '',
   });
 
+  // Get redirect URL from query parameters
+  const redirectUrl = searchParams.get('redirectUrl');
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -26,7 +30,14 @@ export default function LoginPage() {
 
     try {
       await signIn(formData.email, formData.password);
-      router.push('/dashboard');
+      
+      // Redirect to the provided URL if available, otherwise go to dashboard
+      if (redirectUrl) {
+        console.log('Redirecting to:', redirectUrl);
+        router.push(redirectUrl);
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err) {
       setError(handleFirebaseError(err).message);
     } finally {
