@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { getMemorial } from '@/services/memorials';
+import { getMemorial, approveMemorial } from '@/services/memorials';
 import { Memorial } from '@/services/memorials';
 import { isMemorialPublished, canEditMemorial } from '@/lib/permissions';
 import Link from 'next/link';
 import { Icon } from '@/components/ui/Icon';
 import { ErrorBoundary } from 'react-error-boundary';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
 interface Tab {
   id: string;
@@ -138,8 +139,22 @@ function PhotoGallery({ photos, currentIndex, onIndexChange }: {
 
 export default function MemorialPage() {
   const params = useParams();
+  
+  return (
+    <ProtectedRoute
+      allowIfPublished={true}
+      resourceId={params.id as string}
+      redirectTo="/login"
+    >
+      <MemorialContent />
+    </ProtectedRoute>
+  );
+}
+
+function MemorialContent() {
+  const params = useParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, userRoles } = useAuth();
   const [memorial, setMemorial] = useState<Memorial | null>(null);
   const [activeTab, setActiveTab] = useState('home');
   const [loading, setLoading] = useState(true);
@@ -149,6 +164,8 @@ export default function MemorialPage() {
   const [retryCount, setRetryCount] = useState(0);
   const [isPublished, setIsPublished] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+  const [approvalSuccess, setApprovalSuccess] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Check if memorial is published
@@ -256,6 +273,34 @@ export default function MemorialPage() {
     setIsFullscreen(prev => !prev);
   }, []);
 
+  const handleApproveMemorial = async () => {
+    if (!params.id || !user) return;
+    
+    try {
+      setIsApproving(true);
+      await approveMemorial(params.id as string);
+      setApprovalSuccess(true);
+      
+      // Update local state
+      if (memorial) {
+        setMemorial({
+          ...memorial,
+          universityApproved: true
+        });
+      }
+      
+      // Hide success message after 3 seconds
+      setTimeout(() => {
+        setApprovalSuccess(false);
+      }, 3000);
+    } catch (error) {
+      console.error('Error approving memorial:', error);
+      setError('Failed to approve memorial. Please try again.');
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
   if (loading) {
     return <LoadingSpinner />;
   }
@@ -279,6 +324,14 @@ export default function MemorialPage() {
 
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback} onReset={loadMemorial}>
+      {approvalSuccess && (
+        <div className="fixed top-4 right-4 z-50 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded shadow-md">
+          <div className="flex items-center">
+            <Icon name="check-circle" className="h-5 w-5 mr-2" />
+            <span>Memorial approved successfully!</span>
+          </div>
+        </div>
+      )}
       <div className="min-h-screen bg-gray-50">
         {/* Hero Section */}
         <div className="relative">
@@ -316,6 +369,25 @@ export default function MemorialPage() {
                       <Icon name="share" className="h-6 w-6 mr-2" />
                       Share
                     </button>
+                    {user && userRoles?.isUniversityAdmin && memorial && memorial.creatorId !== user.uid && memorial.universityApproved === false && (
+                      <button
+                        onClick={handleApproveMemorial}
+                        disabled={isApproving}
+                        className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200"
+                      >
+                        {isApproving ? (
+                          <>
+                            <Icon name="loading" className="h-5 w-5 mr-2 animate-spin" />
+                            Approving...
+                          </>
+                        ) : (
+                          <>
+                            <Icon name="check" className="h-5 w-5 mr-2" />
+                            Approve Memorial
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

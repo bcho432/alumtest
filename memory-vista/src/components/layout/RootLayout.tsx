@@ -3,6 +3,7 @@
 import { ReactNode } from 'react';
 import { Header } from './Header';
 import { Footer } from './Footer';
+import { GlobalErrorBoundary } from '@/components/error/GlobalErrorBoundary';
 
 interface RootLayoutProps {
   children: ReactNode;
@@ -10,10 +11,12 @@ interface RootLayoutProps {
 
 export function RootLayout({ children }: RootLayoutProps) {
   return (
-    <div className="flex flex-col min-h-screen">
-      <Header />
-      <main className="flex-grow">{children}</main>
-      <Footer />
-    </div>
+    <GlobalErrorBoundary>
+      <div className="flex flex-col min-h-screen">
+        <Header />
+        <main className="flex-grow">{children}</main>
+        <Footer />
+      </div>
+    </GlobalErrorBoundary>
   );
 } 

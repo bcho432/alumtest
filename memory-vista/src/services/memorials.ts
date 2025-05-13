@@ -373,4 +373,31 @@ export const publishMemorial = async (memorialId: string): Promise<void> => {
     }
     throw new Error('Failed to publish memorial. Please try again.');
   }
+};
+
+export const approveMemorial = async (memorialId: string): Promise<void> => {
+  if (!memorialId) {
+    throw new Error('Memorial ID is required');
+  }
+
+  try {
+    const db = getDb();
+    const memorialRef = doc(db, 'memorials', memorialId);
+    const memorialDoc = await getDoc(memorialRef);
+    
+    if (!memorialDoc.exists()) {
+      throw new Error('Memorial not found');
+    }
+
+    await updateDoc(memorialRef, {
+      universityApproved: true,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error approving memorial:', error);
+    if (error instanceof Error) {
+      throw new Error(`Failed to approve memorial: ${error.message}`);
+    }
+    throw new Error('Failed to approve memorial. Please try again.');
+  }
 }; 

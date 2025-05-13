@@ -1,8 +1,9 @@
 'use client';
 
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { isMemorialPublished } from '@/lib/permissions';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -14,6 +15,7 @@ interface ProtectedRouteProps {
 /**
  * A wrapper component that protects routes requiring authentication
  * Redirects unauthenticated users to the login page or specified route
+ * Allows public access to published resources if allowIfPublished is true
  */
 export default function ProtectedRoute({ 
   children, 
@@ -23,18 +25,44 @@ export default function ProtectedRoute({
 }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const [checkingPublication, setCheckingPublication] = useState(false);
+  const [isPublished, setIsPublished] = useState(false);
 
+  // Check if resource is published when allowIfPublished is true
   useEffect(() => {
-    // Only redirect after auth state is confirmed and user is not authenticated
-    if (!loading && !user) {
-      // For memorial pages, we'd check if the memorial is public before redirecting
-      // This would be handled in the page component, not here
+    async function checkPublicationStatus() {
+      if (allowIfPublished && resourceId) {
+        setCheckingPublication(true);
+        try {
+          const published = await isMemorialPublished(resourceId);
+          setIsPublished(published);
+        } catch (error) {
+          console.error('Error checking if resource is published:', error);
+          setIsPublished(false);
+        } finally {
+          setCheckingPublication(false);
+        }
+      }
+    }
+
+    checkPublicationStatus();
+  }, [allowIfPublished, resourceId]);
+
+  // Handle redirection
+  useEffect(() => {
+    // Only redirect after auth state is confirmed and checks are completed
+    if (!loading && !checkingPublication && !user) {
+      // If the resource is published and allowIfPublished is true, don't redirect
+      if (allowIfPublished && isPublished) {
+        return;
+      }
+      // Otherwise redirect to login
       router.push(redirectTo);
     }
-  }, [user, loading, redirectTo, router]);
+  }, [user, loading, redirectTo, router, allowIfPublished, isPublished, checkingPublication]);
 
-  // Show nothing while checking auth state
-  if (loading) {
+  // Show loading while checking auth state or publication status
+  if (loading || (allowIfPublished && checkingPublication)) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
@@ -42,9 +70,8 @@ export default function ProtectedRoute({
     );
   }
 
-  // After loading, if user is authenticated, render children
-  // For pages that might be public, the page component would handle this differently
-  if (user) {
+  // After loading, if user is authenticated or resource is published and allowIfPublished is true, render children
+  if (user || (allowIfPublished && isPublished)) {
     return <>{children}</>;
   }
 
