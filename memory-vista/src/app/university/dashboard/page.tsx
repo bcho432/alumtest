@@ -251,7 +251,10 @@ export default function UniversityDashboard() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => router.push('/university/invitations')}
+                    onClick={() => {
+                      console.log('Redirecting to invitations page');
+                      router.push('/university/invitations');
+                    }}
                     className="inline-flex w-full justify-center items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
                   >
                     <svg className="mr-2 h-5 w-5 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">

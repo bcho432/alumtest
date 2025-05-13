@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/Input';
 
 export default function InvitationsPage() {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute redirectTo="/dashboard">
       <InvitationsContent />
     </ProtectedRoute>
   );
@@ -28,9 +28,11 @@ function InvitationsContent() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [newInvitation, setNewInvitation] = useState<MemorialInvitation | null>(null);
 
-  // Redirect if not a university admin
+  // Redirect if not a university admin - with added debugging
   useEffect(() => {
+    console.log('Invitations page - User roles:', { user: !!user, userRoles });
     if (user && userRoles && !userRoles.isUniversityAdmin) {
+      console.log('User is not a university admin, redirecting to dashboard');
       router.push('/dashboard');
     }
   }, [user, userRoles, router]);

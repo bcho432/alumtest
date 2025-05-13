@@ -8,7 +8,7 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { getAuth, getDb } from '@/lib/firebase';
 
 export interface UserRoles {
@@ -53,13 +53,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const universityRef = doc(db, 'universities', user.uid);
       const universityDoc = await getDoc(universityRef);
       
+      // Check for university associations (for invited creators)
+      const associationsCollection = collection(db, 'userUniversityAssociations');
+      const q = query(associationsCollection, where('userId', '==', user.uid));
+      const associationsSnapshot = await getDocs(q);
+      
+      const universityIds: string[] = [];
+      
+      // If this user is directly a university admin
+      if (universityDoc.exists()) {
+        universityIds.push(user.uid);
+      }
+      
+      // Add any universities user is associated with through invitations
+      associationsSnapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.universityId && !universityIds.includes(data.universityId)) {
+          universityIds.push(data.universityId);
+        }
+      });
+      
       const roles: UserRoles = {
         isUniversityAdmin: universityDoc.exists(),
-        universityAdminFor: universityDoc.exists() ? [user.uid] : [],
+        universityAdminFor: universityIds,
       };
       
-      // In future: we could check other roles here
-      
+      console.log('Loaded user roles:', roles);
       setUserRoles(roles);
     } catch (error) {
       console.error('Error loading user roles:', error);

@@ -187,6 +187,12 @@ export default function Home() {
                 Get started
               </Link>
               <Link
+                href="/guide"
+                className="rounded-md bg-indigo-100 px-3.5 py-2.5 text-sm font-semibold text-indigo-700 shadow-sm hover:bg-indigo-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white transition-all duration-200"
+              >
+                View User Guide
+              </Link>
+              <Link
                 href="/memorial"
                 className="text-sm font-semibold leading-6 text-white hover:text-indigo-200 transition-colors duration-200"
               >

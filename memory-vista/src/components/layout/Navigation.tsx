@@ -14,7 +14,7 @@ interface NavigationProps {
 
 export function Navigation({ orgId, orgName }: NavigationProps) {
   const router = useRouter();
-  const { user, userRoles, signOut } = useAuth();
+  const { user, userRoles, signOut, loading } = useAuth();
 
   const handleSignOut = async () => {
     try {
@@ -23,6 +23,60 @@ export function Navigation({ orgId, orgName }: NavigationProps) {
     } catch (error) {
       console.error('Error signing out:', error);
     }
+  };
+
+  // Only show navigation links that the user has access to based on their role
+  const getNavLinks = () => {
+    // Base links that are always visible
+    const links = [
+      <Link
+        key="home"
+        href="/"
+        className="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700"
+      >
+        Home
+      </Link>
+    ];
+    
+    // Only add links that require authentication if the user is logged in and auth state is confirmed
+    if (user && !loading) {
+      // University link only for university admins
+      if (userRoles?.isUniversityAdmin) {
+        links.push(
+          <Link
+            key="university"
+            href="/university/dashboard"
+            className="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700"
+          >
+            University
+          </Link>
+        );
+      }
+      
+      // My Memorials link for all authenticated users
+      links.push(
+        <Link
+          key="memorials"
+          href="/dashboard"
+          className="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700"
+        >
+          My Memorials
+        </Link>
+      );
+    }
+    
+    // User guide link always visible
+    links.push(
+      <Link
+        key="guide"
+        href="/guide"
+        className="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700"
+      >
+        User Guide
+      </Link>
+    );
+    
+    return links;
   };
 
   return (
@@ -36,41 +90,13 @@ export function Navigation({ orgId, orgName }: NavigationProps) {
               </Link>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-              <Link
-                href="/"
-                className="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700"
-              >
-                Home
-              </Link>
-              
-              {user && userRoles?.isUniversityAdmin && (
-                <Link
-                  href="/university/dashboard"
-                  className="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                >
-                  University
-                </Link>
-              )}
-              
-              {user && (
-                <Link
-                  href="/dashboard"
-                  className="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                >
-                  My Memorials
-                </Link>
-              )}
-              
-              <Link
-                href="/guide"
-                className="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700"
-              >
-                User Guide
-              </Link>
+              {getNavLinks()}
             </div>
           </div>
           <div className="hidden sm:ml-6 sm:flex sm:items-center">
-            {user ? (
+            {loading ? (
+              <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
+            ) : user ? (
               <Menu as="div" className="relative ml-3">
                 <div>
                   <Menu.Button className="flex rounded-full bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
@@ -115,6 +141,18 @@ export function Navigation({ orgId, orgName }: NavigationProps) {
                           } block px-4 py-2 text-sm text-gray-700`}
                         >
                           My Dashboard
+                        </Link>
+                      )}
+                    </Menu.Item>
+                    <Menu.Item>
+                      {({ active }) => (
+                        <Link
+                          href="/guide"
+                          className={`${
+                            active ? 'bg-gray-100' : ''
+                          } block px-4 py-2 text-sm text-gray-700`}
+                        >
+                          User Guide
                         </Link>
                       )}
                     </Menu.Item>
