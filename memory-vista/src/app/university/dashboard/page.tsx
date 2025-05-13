@@ -7,14 +7,22 @@ import { useRouter } from 'next/navigation';
 import { getUniversityMemorials } from '@/services/memorials';
 import { Memorial } from '@/services/memorials';
 import { Icon } from '@/components/ui/Icon';
+import { createInvitation } from '@/services/invitations';
 
 export default function UniversityDashboard() {
   const { user } = useAuth();
   const router = useRouter();
   const [isCreating, setIsCreating] = useState(false);
+  const [showInviteUI, setShowInviteUI] = useState(false);
   const [memorials, setMemorials] = useState<Memorial[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [creatingInvite, setCreatingInvite] = useState(false);
+  const [inviteError, setInviteError] = useState('');
+  const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [newInvitation, setNewInvitation] = useState<any>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -41,6 +49,28 @@ export default function UniversityDashboard() {
 
     fetchMemorials();
   }, [user]);
+
+  // Add the handleCreateInvitation function
+  const handleCreateInvitation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!user) return;
+    
+    setCreatingInvite(true);
+    setInviteError('');
+    
+    try {
+      const invitation = await createInvitation(user.uid, inviteEmail);
+      setNewInvitation(invitation);
+      setInviteSuccess(true);
+      setInviteEmail('');
+    } catch (err) {
+      setInviteError('Failed to create invitation. Please try again.');
+      console.error('Error creating invitation:', err);
+    } finally {
+      setCreatingInvite(false);
+    }
+  };
 
   if (!user) {
     return null;
@@ -253,7 +283,8 @@ export default function UniversityDashboard() {
                     type="button"
                     onClick={() => {
                       console.log('Redirecting to invitations page');
-                      router.push('/university/invitations');
+                      setIsCreating(false);
+                      setShowInviteUI(true);
                     }}
                     className="inline-flex w-full justify-center items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
                   >
@@ -272,6 +303,97 @@ export default function UniversityDashboard() {
                     Cancel
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add the new Invite UI section */}
+      {showInviteUI && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity">
+          <div className="fixed inset-0 z-10 overflow-y-auto">
+            <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+              <div className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
+                <div>
+                  <div className="mt-3 text-center sm:mt-5">
+                    <h3 className="text-base font-semibold leading-6 text-gray-900">
+                      Invite Someone to Create a Memorial
+                    </h3>
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500">
+                        Send an invitation link to someone outside your university to create a memorial.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {inviteError && (
+                  <div className="mt-4 rounded-md bg-red-50 p-4">
+                    <div className="text-sm text-red-700">{inviteError}</div>
+                  </div>
+                )}
+                
+                {inviteSuccess && newInvitation && (
+                  <div className="mt-4 rounded-md bg-green-50 p-4">
+                    <div className="text-sm text-green-700">
+                      <p>Invitation created successfully!</p>
+                      <p className="mt-2">Share this link with the invitee:</p>
+                      <div className="flex mt-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={`${typeof window !== 'undefined' ? window.location.origin : ''}/invitation/accept?token=${newInvitation.token}`}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-l-md text-sm"
+                          onClick={(e) => e.currentTarget.select()}
+                        />
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${typeof window !== 'undefined' ? window.location.origin : ''}/invitation/accept?token=${newInvitation.token}`);
+                            setInviteCopied(true);
+                            setTimeout(() => setInviteCopied(false), 2000);
+                          }}
+                          className="px-3 py-2 bg-indigo-600 text-white text-sm rounded-r-md hover:bg-indigo-500"
+                        >
+                          {inviteCopied ? 'Copied!' : 'Copy'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <form className="mt-5" onSubmit={handleCreateInvitation}>
+                  <div className="mb-4">
+                    <label htmlFor="invite-email" className="block text-sm font-medium text-gray-700 mb-1">
+                      Email Address (Optional)
+                    </label>
+                    <input
+                      type="email"
+                      id="invite-email"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      placeholder="Email of the person you're inviting"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    />
+                  </div>
+                  
+                  <div className="flex space-x-3">
+                    <button
+                      type="submit"
+                      disabled={creatingInvite}
+                      className="flex-1 inline-flex justify-center items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                    >
+                      {creatingInvite ? 'Creating...' : 'Create Invitation'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowInviteUI(false)}
+                      className="flex-1 inline-flex justify-center rounded-md bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-200"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           </div>
