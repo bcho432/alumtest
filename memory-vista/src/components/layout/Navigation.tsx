@@ -30,16 +30,9 @@ export function Navigation({ orgId, orgName }: NavigationProps) {
     // Base links that are always visible
     const links = [
       <Link
-        key="home"
-        href="/"
-        className="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700"
-      >
-        Home
-      </Link>,
-      <Link
         key="guide"
         href="/guide"
-        className="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700"
+        className="inline-flex items-center border-b-2 border-indigo-500 px-1 pt-1 text-sm font-medium text-indigo-600 hover:text-indigo-700"
       >
         <svg 
           className="mr-1 h-4 w-4" 
@@ -55,6 +48,13 @@ export function Navigation({ orgId, orgName }: NavigationProps) {
           />
         </svg>
         User Guide
+      </Link>,
+      <Link
+        key="home"
+        href="/"
+        className="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700"
+      >
+        Home
       </Link>
     ];
     

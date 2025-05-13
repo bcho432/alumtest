@@ -8,6 +8,12 @@ service cloud.firestore {
       allow create, update, delete: if request.auth != null;
     }
     
+    // Allow reading published memorials
+    match /memorials/{memorialId} {
+      allow read: if resource.data.status == 'published' || request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
     // Default rule - require authentication for all operations
     match /{document=**} {
       allow read, write: if request.auth != null;
