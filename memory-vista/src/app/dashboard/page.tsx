@@ -56,14 +56,49 @@ function UserDashboardContent() {
         setUniversities(universityData);
         console.log('Universities data loaded:', universityData);
         
+        // Direct approach: Get ALL memorials first
+        const allMemorialsRef = collection(db, 'memorials');
+        const allQuerySnapshot = await getDocs(allMemorialsRef);
+        console.log('ALL memorials in system:', allQuerySnapshot.size);
+        
+        // Log each memorial to debug
+        allQuerySnapshot.forEach(doc => {
+          const data = doc.data();
+          console.log(`Memorial ${doc.id}:`, {
+            creator: data.creatorId,
+            university: data.universityId,
+            name: data.basicInfo?.name,
+            status: data.status
+          });
+        });
+        
         // Get memorials created by user
         const memorialsRef = collection(db, 'memorials');
+        console.log('Querying memorials where creatorId ==', user.uid);
         const q = query(memorialsRef, where('creatorId', '==', user.uid));
         const querySnapshot = await getDocs(q);
         
         const memorialsData: {[key: string]: Memorial[]} = {};
         
         console.log('Memorials where user is creator:', querySnapshot.size);
+        
+        // Log query details
+        if (querySnapshot.empty) {
+          console.warn('No memorials found where creatorId ==', user.uid);
+          console.log('Debug information:');
+          console.log('- User ID:', user.uid);
+          console.log('- Query path:', q);
+          
+          // Check if any memorial has this user as creator
+          const foundMemorials = allQuerySnapshot.docs.filter(
+            doc => doc.data().creatorId === user.uid
+          );
+          
+          console.log('Manual check found memorials:', foundMemorials.length);
+          foundMemorials.forEach(doc => {
+            console.log('Manual found memorial:', doc.id, doc.data());
+          });
+        }
         
         querySnapshot.forEach((doc) => {
           const memorial = {
@@ -139,6 +174,7 @@ function UserDashboardContent() {
           }
         }
         
+        // Log all the user-related memorials by university
         console.log('All memorials data:', memorialsData);
         setMemorialsByUniversity(memorialsData);
       } catch (err) {

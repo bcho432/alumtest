@@ -302,15 +302,24 @@ export async function getUserUniversityAssociations(userId: string): Promise<Use
   }
   
   try {
+    console.log(`Getting university associations for user: ${userId}`);
     const db = getDb();
     const associationsCollection = collection(db, 'userUniversityAssociations');
-    const q = query(associationsCollection, where('userId', '==', userId));
+    
+    // Use String conversion to ensure consistent type comparisons
+    const userIdStr = String(userId);
+    console.log(`Using normalized user ID: ${userIdStr}`);
+    
+    const q = query(associationsCollection, where('userId', '==', userIdStr));
     const querySnapshot = await getDocs(q);
+    
+    console.log(`Found ${querySnapshot.size} associations for user ${userIdStr}`);
     
     const associations: UserUniversityAssociation[] = [];
     
     querySnapshot.forEach((doc) => {
       const data = doc.data();
+      console.log(`Association ${doc.id}:`, data);
       
       // Handle date conversion
       let createdAt = new Date();
@@ -323,12 +332,20 @@ export async function getUserUniversityAssociations(userId: string): Promise<Use
         }
       }
       
-      associations.push({
+      const memorialIds = Array.isArray(data.memorialIds) ? data.memorialIds : [];
+      
+      const association = {
         ...data,
         id: doc.id,
         createdAt,
-      } as UserUniversityAssociation);
+        memorialIds,
+      } as UserUniversityAssociation;
+      
+      associations.push(association);
     });
+    
+    console.log(`Processed ${associations.length} associations with memorial counts:`, 
+      associations.map(a => `${a.id}: ${a.memorialIds?.length || 0} memorials`));
     
     return associations;
   } catch (error) {

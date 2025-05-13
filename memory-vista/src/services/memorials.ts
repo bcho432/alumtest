@@ -129,6 +129,11 @@ export const createMemorial = async (universityId: string, basicInfo: MemorialBa
     
     const memorialRef = doc(collection(db, 'memorials'));
     const now = new Date();
+    
+    // Ensure creatorId is set and stored as a string
+    const creatorIdStr = creatorId ? String(creatorId) : String(universityId);
+    console.log("Using creator ID:", creatorIdStr);
+    
     const memorial: Memorial = {
       id: memorialRef.id,
       universityId,
@@ -136,8 +141,8 @@ export const createMemorial = async (universityId: string, basicInfo: MemorialBa
       basicInfo,
       createdAt: now,
       updatedAt: now,
-      // If a creatorId is provided, use it; otherwise default to universityId
-      creatorId: creatorId || universityId,
+      // Always store as string to ensure consistent querying
+      creatorId: creatorIdStr,
       collaboratorIds: [],
       universityApproved: creatorId ? false : true, // Auto-approve if university created it
     };
@@ -165,8 +170,8 @@ export const createMemorial = async (universityId: string, basicInfo: MemorialBa
         const associationsRef = collection(db, 'userUniversityAssociations');
         const q = query(
           associationsRef, 
-          where('userId', '==', creatorId),
-          where('universityId', '==', universityId)
+          where('userId', '==', String(creatorId)),
+          where('universityId', '==', String(universityId))
         );
         
         const querySnapshot = await getDocs(q);
@@ -185,6 +190,23 @@ export const createMemorial = async (universityId: string, basicInfo: MemorialBa
           await updateDoc(doc(db, 'userUniversityAssociations', associationDoc.id), {
             memorialIds
           });
+        } else {
+          console.warn(`No user association found for user ${creatorId} and university ${universityId}`);
+          console.log('Creating a new association...');
+          
+          // Create a new association if none exists
+          const newAssociationRef = doc(collection(db, 'userUniversityAssociations'));
+          const newAssociation = {
+            id: newAssociationRef.id,
+            userId: String(creatorId),
+            universityId: String(universityId),
+            role: 'contributor',
+            memorialIds: [memorialRef.id],
+            createdAt: now.toISOString()
+          };
+          
+          await setDoc(newAssociationRef, newAssociation);
+          console.log(`Created new association ${newAssociationRef.id}`);
         }
       } catch (error) {
         // Don't fail the entire operation if this update fails
