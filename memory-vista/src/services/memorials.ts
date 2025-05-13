@@ -155,6 +155,43 @@ export const createMemorial = async (universityId: string, basicInfo: MemorialBa
       updatedAt: now.toISOString(),
     });
 
+    // If the memorial was created by an external user through an invitation,
+    // update their UserUniversityAssociation to include this memorial ID
+    if (creatorId && creatorId !== universityId) {
+      try {
+        console.log(`Memorial created by external user ${creatorId}, updating association`);
+        
+        // Find the user's association with this university
+        const associationsRef = collection(db, 'userUniversityAssociations');
+        const q = query(
+          associationsRef, 
+          where('userId', '==', creatorId),
+          where('universityId', '==', universityId)
+        );
+        
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const associationDoc = querySnapshot.docs[0];
+          const association = associationDoc.data();
+          
+          // Add memorial ID to the association's memorialIds array
+          const memorialIds = Array.isArray(association.memorialIds) 
+            ? [...association.memorialIds, memorialRef.id] 
+            : [memorialRef.id];
+          
+          console.log(`Updating association ${associationDoc.id} with memorial ID ${memorialRef.id}`);
+          
+          await updateDoc(doc(db, 'userUniversityAssociations', associationDoc.id), {
+            memorialIds
+          });
+        }
+      } catch (error) {
+        // Don't fail the entire operation if this update fails
+        console.error('Error updating user association with memorial ID:', error);
+      }
+    }
+
     console.log('Memorial created successfully:', memorialRef.id);
 
     return memorial;

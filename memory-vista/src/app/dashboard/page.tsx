@@ -34,8 +34,11 @@ function UserDashboardContent() {
       if (!user) return;
       
       try {
+        console.log('Loading data for user:', user.uid);
+        
         // Get university associations
         const userAssociations = await getUserUniversityAssociations(user.uid);
+        console.log('User associations loaded:', userAssociations);
         setAssociations(userAssociations);
         
         // Get university details
@@ -51,6 +54,7 @@ function UserDashboardContent() {
         }
         
         setUniversities(universityData);
+        console.log('Universities data loaded:', universityData);
         
         // Get memorials created by user
         const memorialsRef = collection(db, 'memorials');
@@ -58,6 +62,8 @@ function UserDashboardContent() {
         const querySnapshot = await getDocs(q);
         
         const memorialsData: {[key: string]: Memorial[]} = {};
+        
+        console.log('Memorials where user is creator:', querySnapshot.size);
         
         querySnapshot.forEach((doc) => {
           const memorial = {
@@ -73,6 +79,67 @@ function UserDashboardContent() {
           memorialsData[uniId].push(memorial);
         });
         
+        // Also get memorials where the user is listed as a collaborator
+        const collaboratorQuery = query(
+          collection(db, 'memorials'), 
+          where('collaboratorIds', 'array-contains', user.uid)
+        );
+        
+        const collaboratorSnapshot = await getDocs(collaboratorQuery);
+        console.log('Memorials where user is collaborator:', collaboratorSnapshot.size);
+        
+        collaboratorSnapshot.forEach((doc) => {
+          const memorial = {
+            id: doc.id,
+            ...doc.data()
+          } as Memorial;
+          
+          const uniId = memorial.universityId;
+          if (!memorialsData[uniId]) {
+            memorialsData[uniId] = [];
+          }
+          
+          // Check if we already added this memorial (shouldn't happen, but just in case)
+          if (!memorialsData[uniId].some(m => m.id === memorial.id)) {
+            memorialsData[uniId].push(memorial);
+          }
+        });
+        
+        // For each university association, also check if there are memorials linked to it
+        for (const assoc of userAssociations) {
+          // Look for memorials that don't have a creatorId but are associated with this university
+          // This handles the case where a memorial was created via an invitation
+          if (assoc.memorialIds && assoc.memorialIds.length > 0) {
+            console.log(`Association ${assoc.id} has linked memorials:`, assoc.memorialIds);
+            
+            // Fetch each memorial by ID
+            for (const memorialId of assoc.memorialIds) {
+              try {
+                const memorialDoc = await getDoc(doc(db, 'memorials', memorialId));
+                if (memorialDoc.exists()) {
+                  const memorial = {
+                    id: memorialDoc.id,
+                    ...memorialDoc.data()
+                  } as Memorial;
+                  
+                  const uniId = memorial.universityId;
+                  if (!memorialsData[uniId]) {
+                    memorialsData[uniId] = [];
+                  }
+                  
+                  // Check if we already added this memorial
+                  if (!memorialsData[uniId].some(m => m.id === memorial.id)) {
+                    memorialsData[uniId].push(memorial);
+                  }
+                }
+              } catch (err) {
+                console.error(`Error loading association memorial ${memorialId}:`, err);
+              }
+            }
+          }
+        }
+        
+        console.log('All memorials data:', memorialsData);
         setMemorialsByUniversity(memorialsData);
       } catch (err) {
         console.error('Error loading user data:', err);

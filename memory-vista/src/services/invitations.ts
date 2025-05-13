@@ -190,7 +190,7 @@ export async function acceptInvitation(
       userId,
       universityId: invitation.universityId,
       role: 'contributor',
-      memorialIds: [],
+      memorialIds: [], // This will be updated when a memorial is created
       createdAt: now,
     };
     
@@ -198,6 +198,9 @@ export async function acceptInvitation(
       ...association,
       createdAt: now.toISOString(),
     });
+    
+    console.log(`User ${userId} accepted invitation ${invitation.id} for university ${invitation.universityId}`);
+    console.log(`Created association: ${associationRef.id}`);
     
     return {
       invitation: { ...invitation, ...updatedInvitation } as MemorialInvitation,
