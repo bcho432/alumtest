@@ -14,7 +14,6 @@ import { PinButton } from '@/components/common/PinButton';
 import { RoleBasedUI } from '@/components/common/RoleBasedUI';
 import { EditorRequestButton } from '@/components/common/EditorRequestButton';
 import type { University } from '@/types/university';
-import { RootLayout } from '@/components/layout/RootLayout';
 import { toast } from 'react-hot-toast';
 
 interface Memorial {
@@ -214,25 +213,21 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <RootLayout>
-        <div className="min-h-screen flex items-center justify-center">
-          <Icon name="loading" className="animate-spin h-8 w-8 text-indigo-600" />
-        </div>
-      </RootLayout>
+      <div className="min-h-screen flex items-center justify-center">
+        <Icon name="loading" className="animate-spin h-8 w-8 text-indigo-600" />
+      </div>
     );
   }
 
   if (error || !profile) {
     return (
-      <RootLayout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <Icon name="alert-circle" className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
-            <p className="text-gray-600">{error || 'Profile not found'}</p>
-          </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Icon name="alert-circle" className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
+          <p className="text-gray-600">{error || 'Profile not found'}</p>
         </div>
-      </RootLayout>
+      </div>
     );
   }
 
@@ -240,155 +235,153 @@ export default function ProfilePage() {
   const personal = isPersonalProfile ? (profile as PersonalProfile) : undefined;
 
   return (
-    <RootLayout>
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-gradient-primary text-white">
-          <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
-            <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-12">
-              {/* Profile Photo */}
-              <div className="bg-white shadow rounded-lg p-6">
-                <div className="relative mb-6">
-                  {profile.type === 'personal' && (profile as PersonalProfile).photoURL ? (
-                    <img
-                      src={(profile as PersonalProfile).photoURL}
-                      alt={profile.name}
-                      className="w-32 h-32 rounded-full object-cover mx-auto border-4 border-white shadow"
-                    />
-                  ) : profile.type === 'memorial' && (profile as MemorialProfile).imageUrl ? (
-                    <img
-                      src={(profile as MemorialProfile).imageUrl}
-                      alt={profile.name}
-                      className="w-32 h-32 rounded-full object-cover mx-auto border-4 border-white shadow"
-                    />
-                  ) : null}
-                </div>
-              </div>
-              {/* Profile Info */}
-              <div className="text-center md:text-left">
-                <h1 className="text-3xl font-bold">{profile.name}</h1>
-                {/* Only render department and bio for PersonalProfile */}
-                {isPersonalProfile && personal && personal.department && (
-                  <p className="mt-1 text-indigo-200">{personal.department}</p>
-                )}
-                {isPersonalProfile && personal && personal.bio && (
-                  <p className="mt-2 text-indigo-100">{personal.bio}</p>
-                )}
-                <div className="mt-6 flex flex-wrap items-center justify-center md:justify-start gap-4">
-                  <ShareButton profileId={profile.id} />
-                  <PinButton profileId={profile.id} />
-                  <RoleBasedUI allowedRoles={['admin', 'editor']}>
-                    <button
-                      onClick={handleEdit}
-                      className="inline-flex items-center px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg text-sm font-medium transition-colors duration-200"
-                    >
-                      <Icon name="edit" className="mr-2 h-4 w-4" />
-                      Edit Profile
-                    </button>
-                  </RoleBasedUI>
-                  <EditorRequestButton profileId={id as string} />
-                </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-gradient-primary text-white">
+        <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-12">
+            {/* Profile Photo */}
+            <div className="bg-white shadow rounded-lg p-6">
+              <div className="relative mb-6">
+                {profile.type === 'personal' && (profile as PersonalProfile).photoURL ? (
+                  <img
+                    src={(profile as PersonalProfile).photoURL}
+                    alt={profile.name}
+                    className="w-32 h-32 rounded-full object-cover mx-auto border-4 border-white shadow"
+                  />
+                ) : profile.type === 'memorial' && (profile as MemorialProfile).imageUrl ? (
+                  <img
+                    src={(profile as MemorialProfile).imageUrl}
+                    alt={profile.name}
+                    className="w-32 h-32 rounded-full object-cover mx-auto border-4 border-white shadow"
+                  />
+                ) : null}
               </div>
             </div>
-          </div>
-        </div>
-        {/* Main Content */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column */}
-            <div className="lg:col-span-2 space-y-8">
-              {/* About Section */}
-              <div className="bg-white shadow rounded-lg p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">About</h2>
-                <div className="prose max-w-none">
-                  {isPersonalProfile ? (
-                    <div className="space-y-6">
-                      {personal?.location && (
-                        <div>
-                          <h2 className="text-lg font-medium text-gray-900">Location</h2>
-                          <p className="mt-2 text-gray-600">{personal.location}</p>
-                        </div>
-                      )}
-                      {personal?.contact?.email && (
-                        <div>
-                          <h2 className="text-lg font-medium text-gray-900">Contact</h2>
-                          <p className="mt-2 text-gray-600">{personal.contact.email}</p>
-                        </div>
-                      )}
-                      {personal?.graduationYear && (
-                        <div>
-                          <h2 className="text-lg font-medium text-gray-900">Graduation Year</h2>
-                          <p className="mt-2 text-gray-600">{personal.graduationYear}</p>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      <div>
-                        <h2 className="text-lg font-medium text-gray-900">Description</h2>
-                        <p className="mt-2 text-gray-600">{(profile as MemorialProfile).description}</p>
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-medium text-gray-900">Life Story</h2>
-                        <p className="mt-2 text-gray-600">{(profile as MemorialProfile).lifeStory.content}</p>
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-medium text-gray-900">Basic Information</h2>
-                        <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
-                          <div>
-                            <dt className="text-sm font-medium text-gray-500">Date of Birth</dt>
-                            <dd className="mt-1 text-sm text-gray-900">
-                              {(profile as MemorialProfile).basicInfo.dateOfBirth.toLocaleDateString()}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt className="text-sm font-medium text-gray-500">Date of Death</dt>
-                            <dd className="mt-1 text-sm text-gray-900">
-                              {(profile as MemorialProfile).basicInfo.dateOfDeath.toLocaleDateString()}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt className="text-sm font-medium text-gray-500">Birth Location</dt>
-                            <dd className="mt-1 text-sm text-gray-900">
-                              {(profile as MemorialProfile).basicInfo.birthLocation}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt className="text-sm font-medium text-gray-500">Death Location</dt>
-                            <dd className="mt-1 text-sm text-gray-900">
-                              {(profile as MemorialProfile).basicInfo.deathLocation}
-                            </dd>
-                          </div>
-                        </dl>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            {/* Right Column (optional: university info, etc.) */}
-            <div className="space-y-8">
-              {university && (
-                <div className="bg-white shadow rounded-lg p-6">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">University</h2>
-                  <div className="flex items-center space-x-4">
-                    {university.logoUrl && (
-                      <img
-                        src={university.logoUrl}
-                        alt={university.name}
-                        className="h-12 w-12 rounded-full object-cover"
-                      />
-                    )}
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900">{university.name}</h3>
-                      <p className="text-sm text-gray-500">{university.location || university.name}</p>
-                    </div>
-                  </div>
-                </div>
+            {/* Profile Info */}
+            <div className="text-center md:text-left">
+              <h1 className="text-3xl font-bold">{profile.name}</h1>
+              {/* Only render department and bio for PersonalProfile */}
+              {isPersonalProfile && personal && personal.department && (
+                <p className="mt-1 text-indigo-200">{personal.department}</p>
               )}
+              {isPersonalProfile && personal && personal.bio && (
+                <p className="mt-2 text-indigo-100">{personal.bio}</p>
+              )}
+              <div className="mt-6 flex flex-wrap items-center justify-center md:justify-start gap-4">
+                <ShareButton profileId={profile.id} />
+                <PinButton profileId={profile.id} />
+                <RoleBasedUI allowedRoles={['admin', 'editor']}>
+                  <button
+                    onClick={handleEdit}
+                    className="inline-flex items-center px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg text-sm font-medium transition-colors duration-200"
+                  >
+                    <Icon name="edit" className="mr-2 h-4 w-4" />
+                    Edit Profile
+                  </button>
+                </RoleBasedUI>
+                <EditorRequestButton profileId={id as string} />
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </RootLayout>
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column */}
+          <div className="lg:col-span-2 space-y-8">
+            {/* About Section */}
+            <div className="bg-white shadow rounded-lg p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">About</h2>
+              <div className="prose max-w-none">
+                {isPersonalProfile ? (
+                  <div className="space-y-6">
+                    {personal?.location && (
+                      <div>
+                        <h2 className="text-lg font-medium text-gray-900">Location</h2>
+                        <p className="mt-2 text-gray-600">{personal.location}</p>
+                      </div>
+                    )}
+                    {personal?.contact?.email && (
+                      <div>
+                        <h2 className="text-lg font-medium text-gray-900">Contact</h2>
+                        <p className="mt-2 text-gray-600">{personal.contact.email}</p>
+                      </div>
+                    )}
+                    {personal?.graduationYear && (
+                      <div>
+                        <h2 className="text-lg font-medium text-gray-900">Graduation Year</h2>
+                        <p className="mt-2 text-gray-600">{personal.graduationYear}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div>
+                      <h2 className="text-lg font-medium text-gray-900">Description</h2>
+                      <p className="mt-2 text-gray-600">{(profile as MemorialProfile).description}</p>
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-medium text-gray-900">Life Story</h2>
+                      <p className="mt-2 text-gray-600">{(profile as MemorialProfile).lifeStory.content}</p>
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-medium text-gray-900">Basic Information</h2>
+                      <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+                        <div>
+                          <dt className="text-sm font-medium text-gray-500">Date of Birth</dt>
+                          <dd className="mt-1 text-sm text-gray-900">
+                            {(profile as MemorialProfile).basicInfo.dateOfBirth.toLocaleDateString()}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-sm font-medium text-gray-500">Date of Death</dt>
+                          <dd className="mt-1 text-sm text-gray-900">
+                            {(profile as MemorialProfile).basicInfo.dateOfDeath.toLocaleDateString()}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-sm font-medium text-gray-500">Birth Location</dt>
+                          <dd className="mt-1 text-sm text-gray-900">
+                            {(profile as MemorialProfile).basicInfo.birthLocation}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-sm font-medium text-gray-500">Death Location</dt>
+                          <dd className="mt-1 text-sm text-gray-900">
+                            {(profile as MemorialProfile).basicInfo.deathLocation}
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          {/* Right Column (optional: university info, etc.) */}
+          <div className="space-y-8">
+            {university && (
+              <div className="bg-white shadow rounded-lg p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">University</h2>
+                <div className="flex items-center space-x-4">
+                  {university.logoUrl && (
+                    <img
+                      src={university.logoUrl}
+                      alt={university.name}
+                      className="h-12 w-12 rounded-full object-cover"
+                    />
+                  )}
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900">{university.name}</h3>
+                    <p className="text-sm text-gray-500">{university.location || university.name}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

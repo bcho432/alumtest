@@ -40,6 +40,28 @@ export default function StoriatsAdminSettingsPage() {
     }
   }, [user?.email, isStoriatsAdmin, refreshSettings]);
 
+  useEffect(() => {
+    const initializeAdmins = async () => {
+      if (!settings?.adminEmails?.length) {
+        const newAdmins = [
+          'matthew.bo@storiats.com',
+          'justin.lontoh@storiats.com',
+          'derek.lee@storiats.com'
+        ];
+        
+        for (const email of newAdmins) {
+          try {
+            await addAdminEmail(email, 'system');
+          } catch (error) {
+            console.error(`Error adding admin ${email}:`, error);
+          }
+        }
+      }
+    };
+
+    initializeAdmins();
+  }, [settings, addAdminEmail]);
+
   const handleAddAdmin = async () => {
     if (!user?.email) return;
 
@@ -78,76 +100,59 @@ export default function StoriatsAdminSettingsPage() {
 
   if (!user?.email) {
     return (
-      <>
-        <Header />
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
-          <Card className="max-w-md w-full p-6">
-            <div className="text-center">
-              <Icon name="lock" className="w-12 h-12 text-red-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-              <p className="text-gray-600 mb-4">Please log in to access this page</p>
-            </div>
-          </Card>
-        </div>
-        <Footer />
-      </>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
+        <Card className="max-w-md w-full p-6">
+          <div className="text-center">
+            <Icon name="lock" className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
+            <p className="text-gray-600 mb-4">Please log in to access this page</p>
+          </div>
+        </Card>
+      </div>
     );
   }
 
   if (!isStoriatsAdmin(user.email)) {
     return (
-      <>
-        <Header />
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
-          <Card className="max-w-md w-full p-6">
-            <div className="text-center">
-              <Icon name="shield-exclamation" className="w-12 h-12 text-red-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-              <p className="text-gray-600 mb-4">You do not have permission to access this page</p>
-            </div>
-          </Card>
-        </div>
-        <Footer />
-      </>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
+        <Card className="max-w-md w-full p-6">
+          <div className="text-center">
+            <Icon name="shield-exclamation" className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
+            <p className="text-gray-600 mb-4">You do not have permission to access this page</p>
+          </div>
+        </Card>
+      </div>
     );
   }
 
   if (loading) {
     return (
-      <>
-        <Header />
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
-          <Spinner className="w-8 h-8 text-indigo-600" />
-        </div>
-        <Footer />
-      </>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
+        <Spinner className="w-8 h-8 text-indigo-600" />
+      </div>
     );
   }
 
   if (error) {
     return (
-      <>
-        <Header />
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
-          <Card className="max-w-md w-full p-6">
-            <div className="text-center">
-              <Icon name="exclamation-circle" className="w-12 h-12 text-red-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Settings</h2>
-              <p className="text-gray-600 mb-4">{error.message}</p>
-              <Button onClick={refreshSettings} variant="primary">
-                Retry
-              </Button>
-            </div>
-          </Card>
-        </div>
-        <Footer />
-      </>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
+        <Card className="max-w-md w-full p-6">
+          <div className="text-center">
+            <Icon name="exclamation-circle" className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Settings</h2>
+            <p className="text-gray-600 mb-4">{error.message}</p>
+            <Button onClick={refreshSettings} variant="primary">
+              Retry
+            </Button>
+          </div>
+        </Card>
+      </div>
     );
   }
 
   return (
     <ErrorBoundary>
-      <Header />
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white">
         <div className="container mx-auto px-4 py-8">
           <Breadcrumbs
@@ -238,7 +243,6 @@ export default function StoriatsAdminSettingsPage() {
           </div>
         </div>
       </div>
-      <Footer />
 
       <ConfirmDialog
         open={!!showRemoveConfirm}

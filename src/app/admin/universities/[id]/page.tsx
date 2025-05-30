@@ -1,6 +1,5 @@
 import { Suspense } from 'react';
 import UniversityManagementClient from './UniversityManagementClient';
-import { RootLayout } from '@/components/layout/RootLayout';
 
 interface UniversityPageProps {
   params: {
@@ -14,10 +13,8 @@ export default function UniversityPage({ params }: UniversityPageProps) {
   }
 
   return (
-    <RootLayout>
-      <Suspense fallback={<div>Loading...</div>}>
-        <UniversityManagementClient />
-      </Suspense>
-    </RootLayout>
+    <Suspense fallback={<div>Loading...</div>}>
+      <UniversityManagementClient />
+    </Suspense>
   );
 } 

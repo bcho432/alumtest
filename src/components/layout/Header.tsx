@@ -19,14 +19,12 @@ export function Header() {
 
   const navigation = [
     { name: 'Home', href: '/' },
-    { name: 'Profiles', href: '/profiles' },
     { name: 'Training', href: '/training' },
     { name: 'About', href: '/about' },
     { name: 'Contact', href: '/contact' }
   ];
 
   const userNavigation = [
-    { name: 'Your Profile', href: '/profile' },
     { name: 'Settings', href: '/settings' },
     { name: 'Sign out', href: '#' }
   ];

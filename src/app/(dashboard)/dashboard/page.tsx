@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/Button';
 import { getFirebaseServices } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc, DocumentData } from 'firebase/firestore';
 import { useAuth } from '@/hooks/useAuth';
-import { RootLayout } from '@/components/layout/RootLayout';
 import dynamic from 'next/dynamic';
 import { Icon } from '@/components/ui/Icon';
 
@@ -253,9 +252,7 @@ const DashboardContentWithNoSSR = dynamic(() => Promise.resolve(DashboardContent
 // Main dashboard page component
 const Dashboard: React.FC = () => {
   return (
-    <RootLayout>
-      <DashboardContentWithNoSSR />
-    </RootLayout>
+    <DashboardContentWithNoSSR />
   );
 };
 
