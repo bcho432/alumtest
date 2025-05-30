@@ -2,39 +2,169 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if user is authenticated
+    // Helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
-    
-    // Helper function to check if user is the creator
-    function isCreator(creatorId) {
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.admin == true;
+    }
+
+    function isProfileAdmin(profileId) {
       return isAuthenticated() && (
-        creatorId == request.auth.uid || 
-        creatorId == string(request.auth.uid)
+        isAdmin() || 
+        get(/databases/$(database)/documents/profiles/$(profileId)/permissions/$(request.auth.uid)).data.role == 'admin'
       );
     }
-    
-    // Exception for invitations - allow public read access
-    match /invitations/{invitationId} {
-      allow read: if true;
-      allow create, update, delete: if request.auth != null;
+
+    function isProfileEditor(profileId) {
+      return isAuthenticated() && (
+        isAdmin() || 
+        get(/databases/$(database)/documents/profiles/$(profileId)/permissions/$(request.auth.uid)).data.role == 'editor'
+      );
     }
-    
-    // Allow reading published memorials or if user is creator
-    match /memorials/{memorialId} {
-      allow read: if resource.data.status == 'published' || 
-                    isAuthenticated() && (
-                      isCreator(resource.data.creatorId) ||
-                      request.auth.uid in (resource.data.collaboratorIds || []) ||
-                      exists(/databases/$(database)/documents/universities/$(resource.data.universityId)/users/$(request.auth.uid))
-                    );
-      allow write: if isAuthenticated();
+
+    function isProfileViewer(profileId) {
+      return isAuthenticated() && (
+        isAdmin() || 
+        get(/databases/$(database)/documents/profiles/$(profileId)/permissions/$(request.auth.uid)).data.role == 'viewer'
+      );
     }
-    
-    // Default rule - require authentication for all operations
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    function isPublicProfile(profileId) {
+      return get(/databases/$(database)/documents/profiles/$(profileId)).data.isPublic == true;
+    }
+
+    function hasValidRequestStats() {
+      let stats = get(/databases/$(database)/documents/users/$(request.auth.uid)/editorRequestStats/stats).data;
+      return stats.pendingRequests < 3 && 
+        (!stats.cooldownUntil || stats.cooldownUntil.toDate() < request.time);
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Profile roles subcollection
+      match /profileRoles/{document=**} {
+        allow read: if isAuthenticated() && request.auth.uid == userId;
+        allow write: if isAdmin();
+      }
+
+      // Editor request stats
+      match /editorRequestStats/stats {
+        allow read: if isAuthenticated() && request.auth.uid == userId;
+        allow write: if isAuthenticated() && request.auth.uid == userId;
+      }
+    }
+
+    // Profiles collection
+    match /profiles/{profileId} {
+      allow read: if isAuthenticated() && (
+        isProfileViewer(profileId) || 
+        isPublicProfile(profileId)
+      );
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        isProfileAdmin(profileId) || 
+        request.auth.uid == resource.data.userId
+      );
+      allow delete: if isProfileAdmin(profileId);
+
+      // Permissions subcollection
+      match /permissions/{userId} {
+        allow read: if isAuthenticated() && (
+          isProfileAdmin(profileId) || 
+          request.auth.uid == userId
+        );
+        allow write: if isProfileAdmin(profileId);
+      }
+
+      // Editor requests subcollection
+      match /editorRequests/{requestId} {
+        allow read: if isAuthenticated() && (
+          isProfileAdmin(profileId) || 
+          request.auth.uid == resource.data.userId
+        );
+        allow create: if isAuthenticated() && 
+          request.auth.uid == request.resource.data.userId &&
+          hasValidRequestStats();
+        allow update: if isAuthenticated() && (
+          isProfileAdmin(profileId) || 
+          (request.auth.uid == resource.data.userId && 
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']))
+        );
+        allow delete: if isProfileAdmin(profileId);
+      }
+
+      // Content subcollection
+      match /content/{contentId} {
+        allow read: if isAuthenticated() && (
+          isProfileViewer(profileId) || 
+          isPublicProfile(profileId)
+        );
+        allow create: if isAuthenticated() && (
+          isProfileEditor(profileId) || 
+          isProfileAdmin(profileId)
+        );
+        allow update, delete: if isAuthenticated() && (
+          isProfileEditor(profileId) || 
+          isProfileAdmin(profileId)
+        );
+      }
+
+      // Media subcollection
+      match /media/{mediaId} {
+        allow read: if isAuthenticated() && (
+          isProfileViewer(profileId) || 
+          isPublicProfile(profileId)
+        );
+        allow create: if isAuthenticated() && (
+          isProfileEditor(profileId) || 
+          isProfileAdmin(profileId)
+        );
+        allow update, delete: if isAuthenticated() && (
+          isProfileEditor(profileId) || 
+          isProfileAdmin(profileId)
+        );
+      }
+
+      // Comments subcollection
+      match /comments/{commentId} {
+        allow read: if isAuthenticated() && (
+          isProfileViewer(profileId) || 
+          isPublicProfile(profileId)
+        );
+        allow create: if isAuthenticated();
+        allow update, delete: if isAuthenticated() && (
+          request.auth.uid == resource.data.userId || 
+          isProfileAdmin(profileId)
+        );
+      }
+    }
+
+    // Activity logs collection
+    match /activityLogs/{logId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.userId || 
+        isAdmin()
+      );
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow delete: if isAuthenticated() && (
+        request.auth.uid == resource.data.userId || 
+        isAdmin()
+      );
     }
   }
 } 

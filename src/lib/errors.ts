@@ -51,4 +51,51 @@ export function getErrorMessage(error: unknown): string {
     return error.message;
   }
   return 'An unexpected error occurred';
+}
+
+/**
+ * Handle API errors consistently
+ * @param error Error object
+ * @param defaultMessage Default message to show
+ * @returns Error message
+ */
+export function handleApiError(error: unknown, defaultMessage = 'An unexpected error occurred'): string {
+  if (error instanceof AppError) {
+    return error.message;
+  }
+  
+  if (error instanceof Error) {
+    return error.message;
+  }
+  
+  if (typeof error === 'string') {
+    return error;
+  }
+  
+  return defaultMessage;
+}
+
+/**
+ * Handle fetch errors from Firestore consistently
+ * @param error Error from Firestore
+ * @param operation Description of the operation that failed
+ * @param defaultMessage Default message to return
+ * @returns Formatted error message
+ */
+export function handleFirestoreError(
+  error: unknown, 
+  operation = 'database operation', 
+  defaultMessage = 'Failed to perform operation'
+): string {
+  console.error(`Error in ${operation}:`, error);
+  
+  if (error instanceof AppError) {
+    return error.message;
+  }
+  
+  if (error instanceof Error) {
+    return `${defaultMessage}: ${error.message}`;
+  }
+  
+  return defaultMessage;
 } 

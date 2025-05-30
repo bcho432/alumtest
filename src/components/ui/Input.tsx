@@ -1,24 +1,25 @@
-import React, { forwardRef } from 'react';
+import React from 'react';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
-  error?: string | null;
+  error?: string;
   helperText?: string;
 }
 
-export const Input = forwardRef<HTMLInputElement, InputProps>(
+export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, helperText, className = '', id, ...props }, ref) => {
     return (
-      <div className="mb-4">
+      <div className="mb-4" suppressHydrationWarning>
         {label && (
           <label htmlFor={id} className="block text-sm font-medium leading-6 text-gray-900 mb-1">
             {label}
           </label>
         )}
-        <div>
+        <div suppressHydrationWarning>
           <input
             ref={ref}
             id={id}
+            suppressHydrationWarning
             className={`block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ${
               error ? 'ring-red-500' : 'ring-gray-300'
             } placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 ${className}`}
@@ -38,4 +39,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       </div>
     );
   }
-); 
+);
+
+Input.displayName = 'Input'; 

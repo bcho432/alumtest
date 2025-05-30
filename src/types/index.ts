@@ -1,3 +1,5 @@
+import { AllowedRole } from './permission';
+
 export interface Organization {
   id: string;
   name: string;
@@ -13,62 +15,31 @@ export interface Organization {
 
 export interface Profile {
   id: string;
-  orgId: string;
-  createdBy: string;
   name: string;
-  dob?: Date;
-  dod?: Date;
-  locations?: {
-    birth?: string;
-    death?: string;
-    lived?: Array<{ place: string; years: string }>;
-  };
-  education?: Array<{
-    institution: string;
-    degree?: string;
-    years: string;
-  }>;
-  jobs?: Array<{
-    company: string;
-    position?: string;
-    years: string;
-  }>;
-  events?: Array<{
-    date: Date;
-    title: string;
-    description?: string;
-    mediaUrls?: string[];
-  }>;
-  stories?: Array<{
-    question: string;
-    answer: string;
-    authorId: string;
-    createdAt: Date;
-  }>;
-  photos?: Array<{
-    url: string;
-    caption?: string;
-    isHeader?: boolean;
-    uploadedBy: string;
-    uploadedAt: Date;
-  }>;
-  privacy: 'public' | 'private';
-  invitedEmails: string[];
-  shareableUrl: string;
+  isDeceased: boolean;
+  createdBy: string;
+  status: 'draft' | 'published' | 'archived';
   createdAt: Date;
-  updatedAt: Date;
+  universityId: string;
+  basicInfo: {
+    dateOfBirth: Date;
+    dateOfDeath: Date;
+    biography: string;
+    photo: string;
+    birthLocation: string;
+    deathLocation: string;
+  };
+  lifeStory: {
+    content: string;
+    updatedAt: Date;
+  };
 }
 
 export interface User {
-  id: string;
-  email: string;
-  displayName?: string;
-  photoURL?: string;
-  orgRoles: {
-    [orgId: string]: 'admin' | 'family';
-  };
-  createdAt: Date;
-  updatedAt: Date;
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
 }
 
 export interface Candle {
@@ -78,4 +49,24 @@ export interface Candle {
   message: string;
   photoUrl?: string;
   createdAt: Date;
-} 
+}
+
+export interface University {
+  id: string;
+  name: string;
+  createdAt: Date;
+  createdBy: string; // UID
+  admins: string[];
+  isActive: boolean;
+  updatedAt?: Date;
+}
+
+export type UserRole = 'admin' | 'editor' | 'contributor' | 'viewer';
+
+export interface UserPermission {
+  role: AllowedRole;
+  grantedAt: string;
+  grantedBy: string;
+}
+
+export type { MemorialInvitation, UserUniversityAssociation } from '../shared/types/index'; 

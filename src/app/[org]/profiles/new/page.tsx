@@ -1,6 +1,105 @@
-import Link from 'next/link';
+'use client';
 
-export default function NewProfile({ params }: { params: { org: string } }) {
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { profilesService } from '@/services/profiles';
+import { getAuth } from '@/lib/firebase';
+import { Profile } from '@/types';
+import type { User } from 'firebase/auth';
+
+interface PageProps {
+  params: { org: string };
+}
+
+export default function NewProfilePage({ params }: PageProps) {
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const { org } = params;
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+
+    const initAuth = async () => {
+      try {
+        const auth = await getAuth();
+        unsubscribe = auth.onAuthStateChanged((user: User | null) => {
+          if (user) {
+            setUserId(user.uid);
+          } else {
+            router.push('/login');
+          }
+        });
+      } catch (err) {
+        console.error('Error initializing auth:', err);
+        setError('Failed to initialize authentication');
+      }
+    };
+
+    initAuth();
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [router]);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!userId) {
+      setError('You must be logged in to create a profile');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    const formData = new FormData(event.currentTarget);
+    const profileData: Omit<Profile, 'id'> = {
+      name: formData.get('name') as string,
+      isDeceased: formData.get('isDeceased') === 'true',
+      createdBy: userId,
+      status: 'draft',
+      universityId: org,
+      createdAt: new Date(),
+      basicInfo: {
+        dateOfBirth: new Date(formData.get('dob') as string),
+        dateOfDeath: new Date(formData.get('dod') as string),
+        biography: formData.get('bio') as string,
+        photo: '',
+        birthLocation: formData.get('birthLocation') as string,
+        deathLocation: formData.get('deathLocation') as string
+      },
+      lifeStory: {
+        content: formData.get('lifeStory') as string,
+        updatedAt: new Date()
+      }
+    };
+
+    try {
+      await profilesService.createProfile(profileData);
+      router.push(`/${org}/dashboard`);
+    } catch (err) {
+      setError('Failed to create profile. Please try again.');
+      console.error('Error creating profile:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  if (!userId) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold text-gray-900">Loading...</h2>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-white shadow">
@@ -11,7 +110,7 @@ export default function NewProfile({ params }: { params: { org: string } }) {
       <main>
         <div className="mx-auto max-w-7xl py-6 sm:px-6 lg:px-8">
           <div className="px-4 sm:px-0">
-            <form className="space-y-8 divide-y divide-gray-200">
+            <form onSubmit={handleSubmit} className="space-y-8 divide-y divide-gray-200">
               <div className="space-y-8 divide-y divide-gray-200">
                 <div>
                   <div>
@@ -31,8 +130,25 @@ export default function NewProfile({ params }: { params: { org: string } }) {
                           type="text"
                           name="name"
                           id="name"
+                          required
                           className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                         />
+                      </div>
+                    </div>
+
+                    <div className="sm:col-span-3">
+                      <label htmlFor="isDeceased" className="block text-sm font-medium leading-6 text-gray-900">
+                        Status
+                      </label>
+                      <div className="mt-2">
+                        <select
+                          id="isDeceased"
+                          name="isDeceased"
+                          className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                        >
+                          <option value="false">Living</option>
+                          <option value="true">Deceased</option>
+                        </select>
                       </div>
                     </div>
 
@@ -45,6 +161,20 @@ export default function NewProfile({ params }: { params: { org: string } }) {
                           type="date"
                           name="dob"
                           id="dob"
+                          className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="sm:col-span-3">
+                      <label htmlFor="birthLocation" className="block text-sm font-medium leading-6 text-gray-900">
+                        Birth Location
+                      </label>
+                      <div className="mt-2">
+                        <input
+                          type="text"
+                          name="birthLocation"
+                          id="birthLocation"
                           className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                         />
                       </div>
@@ -64,6 +194,20 @@ export default function NewProfile({ params }: { params: { org: string } }) {
                       </div>
                     </div>
 
+                    <div className="sm:col-span-3">
+                      <label htmlFor="deathLocation" className="block text-sm font-medium leading-6 text-gray-900">
+                        Death Location
+                      </label>
+                      <div className="mt-2">
+                        <input
+                          type="text"
+                          name="deathLocation"
+                          id="deathLocation"
+                          className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                        />
+                      </div>
+                    </div>
+
                     <div className="sm:col-span-6">
                       <label htmlFor="bio" className="block text-sm font-medium leading-6 text-gray-900">
                         Biography
@@ -76,39 +220,51 @@ export default function NewProfile({ params }: { params: { org: string } }) {
                           className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                         />
                       </div>
-                      <p className="mt-2 text-sm text-gray-500">Write a few sentences about the person.</p>
+                      <p className="mt-2 text-sm text-gray-500">Write a brief biography.</p>
                     </div>
 
                     <div className="sm:col-span-6">
-                      <label htmlFor="photo" className="block text-sm font-medium leading-6 text-gray-900">
-                        Photo
+                      <label htmlFor="lifeStory" className="block text-sm font-medium leading-6 text-gray-900">
+                        Life Story
                       </label>
-                      <div className="mt-2 flex items-center gap-x-3">
-                        <input
-                          type="file"
-                          name="photo"
-                          id="photo"
-                          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                      <div className="mt-2">
+                        <textarea
+                          id="lifeStory"
+                          name="lifeStory"
+                          rows={6}
+                          className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                         />
                       </div>
+                      <p className="mt-2 text-sm text-gray-500">Write a detailed life story.</p>
                     </div>
                   </div>
                 </div>
               </div>
 
+              {error && (
+                <div className="rounded-md bg-red-50 p-4 mt-4">
+                  <div className="flex">
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800">{error}</h3>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="pt-5">
                 <div className="flex justify-end gap-x-3">
-                  <Link
-                    href={`/${params.org}/dashboard`}
+                  <Link 
+                    href={`/${org}/dashboard`}
                     className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
                   >
                     Cancel
                   </Link>
                   <button
                     type="submit"
-                    className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                    disabled={isSubmitting}
+                    className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Create Profile
+                    {isSubmitting ? 'Creating...' : 'Create Profile'}
                   </button>
                 </div>
               </div>

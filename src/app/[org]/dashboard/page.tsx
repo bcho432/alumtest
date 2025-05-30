@@ -1,6 +1,12 @@
 import Link from 'next/link';
 
-export default function Dashboard({ params }: { params: { org: string } }) {
+interface PageProps {
+  params: { org: string };
+}
+
+export default function Dashboard({ params }: PageProps) {
+  const { org } = params;
+  
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-white shadow">
@@ -16,15 +22,15 @@ export default function Dashboard({ params }: { params: { org: string } }) {
               <div className="sm:flex-auto">
                 <h2 className="text-base font-semibold leading-6 text-gray-900">Profiles</h2>
                 <p className="mt-2 text-sm text-gray-700">
-                  A list of all memorial profiles in your organization.
+                  A list of all profiles in your organization including their name, title, email and role.
                 </p>
               </div>
               <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
                 <Link
-                  href={`/${params.org}/profiles/new`}
+                  href={`/${org}/profiles/new`}
                   className="block rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                 >
-                  Add profile
+                  <span>Create New Profile</span>
                 </Link>
               </div>
             </div>
@@ -74,7 +80,7 @@ export default function Dashboard({ params }: { params: { org: string } }) {
                           </td>
                           <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                             <Link
-                              href={`/${params.org}/profiles/1`}
+                              href={`/${org}/profiles/1`}
                               className="text-indigo-600 hover:text-indigo-900"
                             >
                               Edit<span className="sr-only">, John Doe</span>
