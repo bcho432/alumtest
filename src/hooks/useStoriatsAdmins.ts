@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { collection, doc, getDocs, addDoc, deleteDoc, query, where } from 'firebase/firestore';
+import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { getFirebaseServices } from '@/lib/firebase';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -11,50 +11,99 @@ interface StoriatsAdmin {
   addedAt: Date;
 }
 
+interface AdminSettings {
+  adminEmails: string[];
+  lastUpdated: Date;
+  updatedBy: string;
+}
+
+interface FirestoreAdminSettings {
+  adminEmails: string[];
+  lastUpdated: Timestamp;
+  updatedBy: string;
+}
+
 // Cache for admins to prevent unnecessary fetches
-let cachedAdmins: StoriatsAdmin[] | null = null;
+let cachedSettings: AdminSettings | null = null;
 let lastFetchTime: number = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000;
 
 export const useStoriatsAdmins = () => {
-  const [admins, setAdmins] = useState<StoriatsAdmin[]>([]);
+  const [settings, setSettings] = useState<AdminSettings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const { toast } = useToast();
 
-  const fetchAdmins = useCallback(async (force = false) => {
-    try {
-      // Use cache if available and not expired
-      const now = Date.now();
-      if (!force && cachedAdmins && (now - lastFetchTime) < CACHE_DURATION) {
-        console.log('Using cached admins');
-        setAdmins(cachedAdmins);
+  const fetchSettings = useCallback(async (force = false) => {
+    let retries = 0;
+    
+    while (retries < MAX_RETRIES) {
+      try {
+        // Use cache if available and not expired
+        const now = Date.now();
+        if (!force && cachedSettings && (now - lastFetchTime) < CACHE_DURATION) {
+          console.log('Using cached admin settings');
+          setSettings(cachedSettings);
+          setLoading(false);
+          setError(null);
+          return;
+        }
+
+        const { db } = await getFirebaseServices();
+        if (!db) throw new Error('Firestore instance not available');
+
+        console.log('Fetching admin settings...');
+        const settingsRef = doc(db, 'adminSettings', 'storiatsAdmins');
+        const docSnap = await getDoc(settingsRef);
+        
+        if (docSnap.exists()) {
+          const data = docSnap.data() as FirestoreAdminSettings;
+          const settings: AdminSettings = {
+            ...data,
+            lastUpdated: data.lastUpdated.toDate()
+          };
+          
+          // Update cache
+          cachedSettings = settings;
+          lastFetchTime = now;
+          
+          setSettings(settings);
+          setError(null);
+          console.log('Fetched admin settings:', settings);
+        } else {
+          // Initialize with default settings if document doesn't exist
+          const defaultSettings: AdminSettings = {
+            adminEmails: [],
+            lastUpdated: new Date(),
+            updatedBy: 'system'
+          };
+          await setDoc(settingsRef, {
+            ...defaultSettings,
+            lastUpdated: Timestamp.fromDate(defaultSettings.lastUpdated)
+          });
+          setSettings(defaultSettings);
+          cachedSettings = defaultSettings;
+          lastFetchTime = now;
+          setError(null);
+        }
+        
         setLoading(false);
         return;
+      } catch (error) {
+        console.error(`Error fetching admin settings (attempt ${retries + 1}/${MAX_RETRIES}):`, error);
+        retries++;
+        
+        if (retries === MAX_RETRIES) {
+          setError(error instanceof Error ? error : new Error('Failed to fetch admin settings'));
+          setLoading(false);
+          toast('Failed to fetch admin settings', 'error');
+        } else {
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        }
       }
-
-      const { db } = await getFirebaseServices();
-      if (!db) throw new Error('Firestore instance not available');
-
-      console.log('Fetching Storiats admins...');
-      const adminsRef = collection(db, 'storiatsAdmins');
-      const snapshot = await getDocs(adminsRef);
-      const adminList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        addedAt: doc.data().addedAt.toDate()
-      })) as StoriatsAdmin[];
-
-      // Update cache
-      cachedAdmins = adminList;
-      lastFetchTime = now;
-      
-      setAdmins(adminList);
-      console.log('Fetched admins:', adminList.map(a => a.email));
-    } catch (error) {
-      console.error('Error fetching Storiats admins:', error);
-      toast('Failed to fetch Storiats admins', 'error');
-    } finally {
-      setLoading(false);
     }
   }, [toast]);
 
@@ -63,43 +112,64 @@ export const useStoriatsAdmins = () => {
       const { db } = await getFirebaseServices();
       if (!db) throw new Error('Firestore instance not available');
 
+      const emailLower = email.toLowerCase();
+      
       // Check if admin already exists
-      const existingAdmin = admins.find(admin => admin.email === email);
-      if (existingAdmin) {
+      if (settings?.adminEmails.includes(emailLower)) {
         toast('This email is already a Storiats admin', 'error');
         return;
       }
 
-      const adminsRef = collection(db, 'storiatsAdmins');
-      const newAdmin = {
-        email,
-        name,
-        addedBy,
-        addedAt: new Date()
-      };
+      const settingsRef = doc(db, 'adminSettings', 'storiatsAdmins');
+      const newEmails = [...(settings?.adminEmails || []), emailLower];
+      
+      await setDoc(settingsRef, {
+        adminEmails: newEmails,
+        lastUpdated: Timestamp.now(),
+        updatedBy: addedBy
+      });
 
-      await addDoc(adminsRef, newAdmin);
-      await fetchAdmins(true); // Force refresh the list
-
+      await fetchSettings(true); // Force refresh
       toast('Storiats admin added successfully', 'success');
     } catch (error) {
       console.error('Error adding Storiats admin:', error);
       toast('Failed to add Storiats admin', 'error');
+      throw error;
     }
   };
 
-  const removeAdmin = async (adminId: string) => {
+  const removeAdmin = async (email: string, updatedBy: string) => {
     try {
       const { db } = await getFirebaseServices();
       if (!db) throw new Error('Firestore instance not available');
 
-      await deleteDoc(doc(db, 'storiatsAdmins', adminId));
-      await fetchAdmins(true); // Force refresh the list
+      const emailLower = email.toLowerCase();
+      if (!settings?.adminEmails.includes(emailLower)) {
+        toast('Email not in admin list', 'error');
+        return;
+      }
 
+      // Prevent removing the last admin
+      if (settings.adminEmails.length <= 1) {
+        toast('Cannot remove the last admin', 'error');
+        return;
+      }
+
+      const settingsRef = doc(db, 'adminSettings', 'storiatsAdmins');
+      const newEmails = settings.adminEmails.filter(e => e !== emailLower);
+      
+      await setDoc(settingsRef, {
+        adminEmails: newEmails,
+        lastUpdated: Timestamp.now(),
+        updatedBy
+      });
+
+      await fetchSettings(true); // Force refresh
       toast('Storiats admin removed successfully', 'success');
     } catch (error) {
       console.error('Error removing Storiats admin:', error);
       toast('Failed to remove Storiats admin', 'error');
+      throw error;
     }
   };
 
@@ -110,24 +180,35 @@ export const useStoriatsAdmins = () => {
     }
     const normalizedEmail = email.toLowerCase();
     console.log('Checking admin status for:', normalizedEmail);
-    console.log('Available admins:', admins.map(a => a.email.toLowerCase()));
-    const isAdmin = admins.some(admin => admin.email.toLowerCase() === normalizedEmail);
+    console.log('Available admins:', settings?.adminEmails || []);
+    const isAdmin = settings?.adminEmails.includes(normalizedEmail) ?? false;
     console.log('Admin check result:', isAdmin);
     return isAdmin;
-  }, [admins]);
+  }, [settings]);
 
   // Initial fetch
   useEffect(() => {
-    console.log('Initial fetch of Storiats admins');
-    fetchAdmins();
-  }, [fetchAdmins]);
+    console.log('Initial fetch of admin settings');
+    fetchSettings();
+  }, [fetchSettings]);
+
+  // Transform settings into the expected format for the admin management page
+  const admins = settings?.adminEmails.map(email => ({
+    id: email,
+    email,
+    name: email.split('@')[0], // Use part before @ as name
+    addedBy: settings.updatedBy,
+    addedAt: settings.lastUpdated
+  })) || [];
 
   return {
+    settings,
     admins,
     loading,
+    error,
     addAdmin,
     removeAdmin,
     isStoriatsAdmin,
-    refreshAdmins: () => fetchAdmins(true)
+    refreshSettings: () => fetchSettings(true)
   };
 }; 
