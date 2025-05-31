@@ -7,6 +7,7 @@ import { profilesService } from '@/services/profiles';
 import { getAuth } from '@/lib/firebase';
 import { Profile } from '@/types';
 import type { User } from 'firebase/auth';
+import { Timestamp } from 'firebase/firestore';
 
 interface PageProps {
   params: { org: string };
@@ -58,16 +59,48 @@ export default function NewProfilePage({ params }: PageProps) {
     setError(null);
 
     const formData = new FormData(event.currentTarget);
+    const dob = formData.get('dob') as string;
+    const dod = formData.get('dod') as string;
+
+    // Validate dates
+    if (!dob) {
+      setError('Date of birth is required');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const dobDate = new Date(dob);
+    if (isNaN(dobDate.getTime())) {
+      setError('Invalid date of birth');
+      setIsSubmitting(false);
+      return;
+    }
+
+    let dodDate: Date | undefined;
+    if (dod) {
+      dodDate = new Date(dod);
+      if (isNaN(dodDate.getTime())) {
+        setError('Invalid date of death');
+        setIsSubmitting(false);
+        return;
+      }
+      if (dodDate < dobDate) {
+        setError('Date of death must be after date of birth');
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     const profileData: Omit<Profile, 'id'> = {
       name: formData.get('name') as string,
       isDeceased: formData.get('isDeceased') === 'true',
       createdBy: userId,
       status: 'draft',
       universityId: org,
-      createdAt: new Date(),
+      createdAt: Timestamp.now(),
       basicInfo: {
-        dateOfBirth: new Date(formData.get('dob') as string),
-        dateOfDeath: new Date(formData.get('dod') as string),
+        dateOfBirth: Timestamp.fromDate(dobDate),
+        dateOfDeath: dodDate ? Timestamp.fromDate(dodDate) : undefined,
         biography: formData.get('bio') as string,
         photo: '',
         birthLocation: formData.get('birthLocation') as string,
@@ -75,7 +108,7 @@ export default function NewProfilePage({ params }: PageProps) {
       },
       lifeStory: {
         content: formData.get('lifeStory') as string,
-        updatedAt: new Date()
+        updatedAt: Timestamp.now()
       }
     };
 

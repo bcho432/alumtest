@@ -21,7 +21,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { validateProfile } from '@/types/profile';
 import { debounce } from 'lodash';
-import { toTimestamp, formatDateForInput, isValidDateRange, isDateInPast } from '@/utils/dateUtils';
 
 // Dynamically import the rich text editor to avoid SSR issues
 const RichTextEditor = dynamic(() => import('@/components/ui/RichTextEditor').then(mod => mod.RichTextEditor), {
@@ -260,21 +259,31 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
     
     if (field === 'dateOfBirth' && value) {
       const dateValue = value instanceof Timestamp ? value.toDate() : value;
-      if (!isDateInPast(dateValue)) {
+      if (dateValue > new Date()) {
         errors.push('Date of birth must be in the past');
       }
-      if (formData.basicInfo.dateOfDeath && !isValidDateRange(dateValue, formData.basicInfo.dateOfDeath)) {
-        errors.push('Date of birth must be before date of death');
+      if (formData.basicInfo.dateOfDeath) {
+        const deathDate = formData.basicInfo.dateOfDeath instanceof Timestamp 
+          ? formData.basicInfo.dateOfDeath.toDate() 
+          : formData.basicInfo.dateOfDeath;
+        if (dateValue > deathDate) {
+          errors.push('Date of birth must be before date of death');
+        }
       }
     }
     
     if (field === 'dateOfDeath' && value) {
       const dateValue = value instanceof Timestamp ? value.toDate() : value;
-      if (!isDateInPast(dateValue)) {
+      if (dateValue > new Date()) {
         errors.push('Date of death must be in the past');
       }
-      if (formData.basicInfo.dateOfBirth && !isValidDateRange(formData.basicInfo.dateOfBirth, dateValue)) {
-        errors.push('Date of death must be after date of birth');
+      if (formData.basicInfo.dateOfBirth) {
+        const birthDate = formData.basicInfo.dateOfBirth instanceof Timestamp 
+          ? formData.basicInfo.dateOfBirth.toDate() 
+          : formData.basicInfo.dateOfBirth;
+        if (dateValue < birthDate) {
+          errors.push('Date of death must be after date of birth');
+        }
       }
     }
 
@@ -370,12 +379,18 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
         updatedBy: user?.uid || 'system',
         basicInfo: {
           ...formData.basicInfo,
-          dateOfBirth: toTimestamp(formData.basicInfo.dateOfBirth),
-          dateOfDeath: toTimestamp(formData.basicInfo.dateOfDeath)
+          dateOfBirth: formData.basicInfo.dateOfBirth instanceof Timestamp 
+            ? formData.basicInfo.dateOfBirth 
+            : Timestamp.fromDate(formData.basicInfo.dateOfBirth),
+          dateOfDeath: formData.basicInfo.dateOfDeath instanceof Timestamp
+            ? formData.basicInfo.dateOfDeath
+            : formData.basicInfo.dateOfDeath ? Timestamp.fromDate(formData.basicInfo.dateOfDeath) : undefined
         },
         lifeStory: {
           ...formData.lifeStory,
-          updatedAt: toTimestamp(formData.lifeStory.updatedAt)
+          updatedAt: formData.lifeStory.updatedAt instanceof Timestamp 
+            ? formData.lifeStory.updatedAt 
+            : Timestamp.fromDate(formData.lifeStory.updatedAt)
         },
         metadata: {
           ...formData.metadata,
@@ -465,7 +480,11 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
                   <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
                   <Input
                     type="date"
-                    value={formatDateForInput(formData.basicInfo.dateOfBirth)}
+                    value={formData.basicInfo.dateOfBirth instanceof Date 
+                      ? formData.basicInfo.dateOfBirth.toISOString().split('T')[0]
+                      : formData.basicInfo.dateOfBirth instanceof Timestamp
+                        ? formData.basicInfo.dateOfBirth.toDate().toISOString().split('T')[0]
+                        : ''}
                     onChange={(e) => {
                       const newDate = e.target.value ? new Date(e.target.value) : undefined;
                       validateDateField('dateOfBirth', newDate);
@@ -486,7 +505,11 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
                   <label className="block text-sm font-medium text-gray-700">Date of Death</label>
                   <Input
                     type="date"
-                    value={formatDateForInput(formData.basicInfo.dateOfDeath)}
+                    value={formData.basicInfo.dateOfDeath instanceof Date 
+                      ? formData.basicInfo.dateOfDeath.toISOString().split('T')[0]
+                      : formData.basicInfo.dateOfDeath instanceof Timestamp
+                        ? formData.basicInfo.dateOfDeath.toDate().toISOString().split('T')[0]
+                        : ''}
                     onChange={(e) => {
                       const newDate = e.target.value ? new Date(e.target.value) : undefined;
                       validateDateField('dateOfDeath', newDate);
@@ -495,7 +518,13 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
                         dateOfDeath: newDate
                       });
                     }}
-                    min={formData.basicInfo.dateOfBirth ? formatDateForInput(formData.basicInfo.dateOfBirth) : undefined}
+                    min={formData.basicInfo.dateOfBirth 
+                      ? (formData.basicInfo.dateOfBirth instanceof Date 
+                        ? formData.basicInfo.dateOfBirth.toISOString().split('T')[0]
+                        : formData.basicInfo.dateOfBirth instanceof Timestamp
+                          ? formData.basicInfo.dateOfBirth.toDate().toISOString().split('T')[0]
+                          : undefined)
+                      : undefined}
                     max={new Date().toISOString().split('T')[0]}
                     className={`mt-1 ${fieldErrors.dateOfDeath ? 'border-red-500' : ''}`}
                   />

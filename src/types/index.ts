@@ -1,4 +1,5 @@
 import { AllowedRole } from './permission';
+import { Timestamp } from 'firebase/firestore';
 
 export interface Organization {
   id: string;
@@ -19,11 +20,11 @@ export interface Profile {
   isDeceased: boolean;
   createdBy: string;
   status: 'draft' | 'published' | 'archived';
-  createdAt: Date;
+  createdAt: Timestamp;
   universityId: string;
   basicInfo: {
-    dateOfBirth: Date;
-    dateOfDeath: Date;
+    dateOfBirth: Timestamp;
+    dateOfDeath?: Timestamp;
     biography: string;
     photo: string;
     birthLocation: string;
@@ -31,7 +32,7 @@ export interface Profile {
   };
   lifeStory: {
     content: string;
-    updatedAt: Date;
+    updatedAt: Timestamp;
   };
 }
 

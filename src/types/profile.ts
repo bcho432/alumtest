@@ -116,39 +116,54 @@ export interface Video {
 
 export interface BaseProfile {
   id: string;
+  type: 'personal' | 'memorial';
   name: string;
   status: 'draft' | 'published';
-  createdAt: string;
-  updatedAt: string;
+  isPublic: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
   createdBy: string;
   updatedBy: string;
-  isPublic: boolean;
   metadata: {
     tags: string[];
     categories: string[];
     lastModifiedBy: string;
-    lastModifiedAt: string;
+    lastModifiedAt: string | Timestamp;
     version: number;
   };
 }
 
 export interface PersonalProfile extends BaseProfile {
   type: 'personal';
-  email?: string;
-  bio?: string;
-  location?: string;
-  photoURL?: string;
-  coverImage?: string;
-  department?: string;
-  graduationYear?: string;
-  contact?: {
-    email?: string;
-    phone?: string;
-    website?: string;
+  bio: string;
+  photoURL: string;
+  location: string;
+  department: string;
+  graduationYear: string;
+  contact: {
+    email: string;
+    phone: string;
+    website: string;
   };
-  education?: Education[];
-  experience?: Experience[];
-  achievements?: Achievement[];
+  education: Array<{
+    institution: string;
+    degree: string;
+    field: string;
+    startDate: Timestamp;
+    endDate: Timestamp;
+  }>;
+  experience: Array<{
+    company: string;
+    position: string;
+    startDate: Timestamp;
+    endDate: Timestamp;
+    description: string;
+  }>;
+  achievements: Array<{
+    title: string;
+    date: Timestamp;
+    description: string;
+  }>;
 }
 
 export interface MemorialProfile extends BaseProfile {
@@ -156,10 +171,9 @@ export interface MemorialProfile extends BaseProfile {
   universityId: string;
   description: string;
   imageUrl: string;
-  photoURL?: string;
   basicInfo: {
-    dateOfBirth: Date;
-    dateOfDeath: Date;
+    dateOfBirth: Date | Timestamp;
+    dateOfDeath: Date | Timestamp;
     biography: string;
     photo: string;
     birthLocation: string;
@@ -167,15 +181,7 @@ export interface MemorialProfile extends BaseProfile {
   };
   lifeStory: {
     content: string;
-    updatedAt: Date;
-  };
-  education?: Education[];
-  experience?: Experience[];
-  achievements?: Achievement[];
-  timeline?: TimelineEvent[];
-  media?: {
-    photos: Photo[];
-    videos: Video[];
+    updatedAt: Date | Timestamp;
   };
 }
 
@@ -510,7 +516,7 @@ export const validateProfile = (profile: Partial<Profile>): string[] => {
   if (profile.type === 'personal') {
     const personal = profile as Partial<PersonalProfile>;
     
-    if (!personal.email?.trim()) {
+    if (!personal.contact?.email?.trim()) {
       errors.push('Email is required for personal profiles');
     }
 

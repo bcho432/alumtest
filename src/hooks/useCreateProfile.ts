@@ -17,8 +17,8 @@ interface CreateProfileParams {
   description?: string;
   imageUrl?: string;
   basicInfo?: {
-    dateOfBirth?: Date;
-    dateOfDeath?: Date;
+    dateOfBirth?: Date | Timestamp;
+    dateOfDeath?: Date | Timestamp;
     biography?: string;
     photo?: string;
     birthLocation?: string;
@@ -26,7 +26,7 @@ interface CreateProfileParams {
   };
   lifeStory?: {
     content?: string;
-    updatedAt?: Date;
+    updatedAt?: Date | Timestamp;
   };
   isPublic?: boolean;
   metadata?: {
@@ -75,8 +75,8 @@ export function useCreateProfile() {
         id: profileId,
         universityId: params.universityId,
         status: params.status,
-        createdAt: Timestamp.now().toDate().toISOString(),
-        updatedAt: Timestamp.now().toDate().toISOString(),
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
         createdBy: params.createdBy,
         updatedBy: params.updatedBy,
         isPublic: params.isPublic || false,
@@ -84,7 +84,7 @@ export function useCreateProfile() {
           tags: params.metadata?.tags || [],
           categories: params.metadata?.categories || [],
           lastModifiedBy: params.metadata?.lastModifiedBy || params.updatedBy,
-          lastModifiedAt: Timestamp.now().toDate().toISOString(),
+          lastModifiedAt: Timestamp.now(),
           version: params.metadata?.version || 1
         }
       };
@@ -100,8 +100,16 @@ export function useCreateProfile() {
           description: params.description || '',
           imageUrl: params.imageUrl || '',
           basicInfo: {
-            dateOfBirth: params.basicInfo?.dateOfBirth ? new Date(params.basicInfo.dateOfBirth) : new Date(),
-            dateOfDeath: params.basicInfo?.dateOfDeath ? new Date(params.basicInfo.dateOfDeath) : new Date(),
+            dateOfBirth: params.basicInfo?.dateOfBirth 
+              ? (params.basicInfo.dateOfBirth instanceof Timestamp 
+                ? params.basicInfo.dateOfBirth 
+                : Timestamp.fromDate(new Date(params.basicInfo.dateOfBirth)))
+              : undefined,
+            dateOfDeath: params.basicInfo?.dateOfDeath
+              ? (params.basicInfo.dateOfDeath instanceof Timestamp
+                ? params.basicInfo.dateOfDeath
+                : Timestamp.fromDate(new Date(params.basicInfo.dateOfDeath)))
+              : undefined,
             biography: params.basicInfo?.biography || '',
             photo: params.basicInfo?.photo || '',
             birthLocation: params.basicInfo?.birthLocation || '',
@@ -109,7 +117,7 @@ export function useCreateProfile() {
           },
           lifeStory: {
             content: params.lifeStory?.content || '',
-            updatedAt: params.lifeStory?.updatedAt ? new Date(params.lifeStory.updatedAt) : new Date()
+            updatedAt: params.lifeStory?.updatedAt instanceof Timestamp ? params.lifeStory.updatedAt : params.lifeStory?.updatedAt ? Timestamp.fromDate(params.lifeStory.updatedAt) : Timestamp.now()
           }
         } as MemorialProfile;
       } else {
