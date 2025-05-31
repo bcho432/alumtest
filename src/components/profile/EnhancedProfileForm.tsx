@@ -10,7 +10,7 @@ import { Select } from '@/components/ui/Select';
 import { Tabs } from '@/components/ui/Tabs';
 import { useToast } from '@/components/ui/toast';
 import { getFirebaseServices } from '@/lib/firebase';
-import { collection, doc, setDoc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, getDoc, Timestamp } from 'firebase/firestore';
 import { storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import dynamic from 'next/dynamic';
@@ -21,6 +21,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { validateProfile } from '@/types/profile';
 import { debounce } from 'lodash';
+import { toTimestamp, formatDateForInput, isValidDateRange, isDateInPast } from '@/utils/dateUtils';
 
 // Dynamically import the rich text editor to avoid SSR issues
 const RichTextEditor = dynamic(() => import('@/components/ui/RichTextEditor').then(mod => mod.RichTextEditor), {
@@ -34,8 +35,8 @@ interface ProfileFormData {
   description: string;
   imageUrl: string;
   basicInfo: {
-    dateOfBirth: Date;
-    dateOfDeath?: Date;
+    dateOfBirth: Date | Timestamp;
+    dateOfDeath?: Date | Timestamp;
     biography: string;
     photo: string;
     birthLocation?: string;
@@ -43,7 +44,7 @@ interface ProfileFormData {
   };
   lifeStory: {
     content: string;
-    updatedAt: Date;
+    updatedAt: Date | Timestamp;
   };
   status: 'draft' | 'published';
   isPublic: boolean;
@@ -105,6 +106,10 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
       version: 1,
     },
   });
+  const [fieldErrors, setFieldErrors] = useState<{
+    dateOfBirth?: string;
+    dateOfDeath?: string;
+  }>({});
 
   // Autosave functionality
   const debouncedSave = useCallback(
@@ -250,6 +255,37 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
     }
   };
 
+  const validateDateField = (field: 'dateOfBirth' | 'dateOfDeath', value: Date | Timestamp | undefined) => {
+    const errors: string[] = [];
+    
+    if (field === 'dateOfBirth' && value) {
+      const dateValue = value instanceof Timestamp ? value.toDate() : value;
+      if (!isDateInPast(dateValue)) {
+        errors.push('Date of birth must be in the past');
+      }
+      if (formData.basicInfo.dateOfDeath && !isValidDateRange(dateValue, formData.basicInfo.dateOfDeath)) {
+        errors.push('Date of birth must be before date of death');
+      }
+    }
+    
+    if (field === 'dateOfDeath' && value) {
+      const dateValue = value instanceof Timestamp ? value.toDate() : value;
+      if (!isDateInPast(dateValue)) {
+        errors.push('Date of death must be in the past');
+      }
+      if (formData.basicInfo.dateOfBirth && !isValidDateRange(formData.basicInfo.dateOfBirth, dateValue)) {
+        errors.push('Date of death must be after date of birth');
+      }
+    }
+
+    setFieldErrors(prev => ({
+      ...prev,
+      [field]: errors.length > 0 ? errors[0] : undefined
+    }));
+
+    return errors.length === 0;
+  };
+
   const validateForm = (): string[] => {
     const errors: string[] = [];
 
@@ -267,10 +303,12 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
     }
 
     // Date validation
-    if (formData.basicInfo.dateOfDeath && 
-        formData.basicInfo.dateOfBirth && 
-        formData.basicInfo.dateOfDeath < formData.basicInfo.dateOfBirth) {
-      errors.push('Date of death must be after date of birth');
+    if (!validateDateField('dateOfBirth', formData.basicInfo.dateOfBirth)) {
+      errors.push('Date of birth must be in the past');
+    }
+
+    if (!validateDateField('dateOfDeath', formData.basicInfo.dateOfDeath)) {
+      errors.push('Date of death must be in the past');
     }
 
     // Memorial-specific validation
@@ -324,15 +362,25 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
       const { db } = await getFirebaseServices();
       if (!db) return;
 
+      // Convert dates to Timestamps before saving
       const profileData = {
         ...formData,
         status,
-        updatedAt: new Date().toISOString(),
+        updatedAt: Timestamp.now(),
         updatedBy: user?.uid || 'system',
+        basicInfo: {
+          ...formData.basicInfo,
+          dateOfBirth: toTimestamp(formData.basicInfo.dateOfBirth),
+          dateOfDeath: toTimestamp(formData.basicInfo.dateOfDeath)
+        },
+        lifeStory: {
+          ...formData.lifeStory,
+          updatedAt: toTimestamp(formData.lifeStory.updatedAt)
+        },
         metadata: {
           ...formData.metadata,
           lastModifiedBy: user?.uid || 'system',
-          lastModifiedAt: new Date().toISOString(),
+          lastModifiedAt: Timestamp.now().toDate().toISOString(),
           version: (formData.metadata.version || 0) + 1
         }
       };
@@ -345,7 +393,7 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
         await setDoc(newProfileRef, {
           ...profileData,
           id: newProfileRef.id,
-          createdAt: new Date().toISOString(),
+          createdAt: Timestamp.now(),
           createdBy: user?.uid || 'system'
         });
       }
@@ -417,26 +465,43 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
                   <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
                   <Input
                     type="date"
-                    value={formData.basicInfo.dateOfBirth.toISOString().split('T')[0]}
-                    onChange={(e) => handleInputChange('basicInfo', {
-                      ...formData.basicInfo,
-                      dateOfBirth: new Date(e.target.value)
-                    })}
-                    className="mt-1"
+                    value={formatDateForInput(formData.basicInfo.dateOfBirth)}
+                    onChange={(e) => {
+                      const newDate = e.target.value ? new Date(e.target.value) : undefined;
+                      validateDateField('dateOfBirth', newDate);
+                      handleInputChange('basicInfo', {
+                        ...formData.basicInfo,
+                        dateOfBirth: newDate
+                      });
+                    }}
+                    max={new Date().toISOString().split('T')[0]}
+                    className={`mt-1 ${fieldErrors.dateOfBirth ? 'border-red-500' : ''}`}
                   />
+                  {fieldErrors.dateOfBirth && (
+                    <p className="mt-1 text-sm text-red-600">{fieldErrors.dateOfBirth}</p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Date of Death</label>
                   <Input
                     type="date"
-                    value={formData.basicInfo.dateOfDeath?.toISOString().split('T')[0]}
-                    onChange={(e) => handleInputChange('basicInfo', {
-                      ...formData.basicInfo,
-                      dateOfDeath: e.target.value ? new Date(e.target.value) : undefined
-                    })}
-                    className="mt-1"
+                    value={formatDateForInput(formData.basicInfo.dateOfDeath)}
+                    onChange={(e) => {
+                      const newDate = e.target.value ? new Date(e.target.value) : undefined;
+                      validateDateField('dateOfDeath', newDate);
+                      handleInputChange('basicInfo', {
+                        ...formData.basicInfo,
+                        dateOfDeath: newDate
+                      });
+                    }}
+                    min={formData.basicInfo.dateOfBirth ? formatDateForInput(formData.basicInfo.dateOfBirth) : undefined}
+                    max={new Date().toISOString().split('T')[0]}
+                    className={`mt-1 ${fieldErrors.dateOfDeath ? 'border-red-500' : ''}`}
                   />
+                  {fieldErrors.dateOfDeath && (
+                    <p className="mt-1 text-sm text-red-600">{fieldErrors.dateOfDeath}</p>
+                  )}
                 </div>
 
                 <div>
