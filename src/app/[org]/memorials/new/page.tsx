@@ -8,6 +8,8 @@ import { useCreateProfile } from '@/hooks/useCreateProfile';
 import { toast } from 'react-hot-toast';
 import { MemorialProfile, MemorialProfileFormData } from '@/types/profile';
 import { Timestamp } from 'firebase/firestore';
+import { getFirebaseServices } from '@/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 export default function NewMemorialPage() {
   const { org } = useParams();
@@ -17,8 +19,14 @@ export default function NewMemorialPage() {
 
   const handleSubmit = async (data: MemorialProfileFormData) => {
     try {
-      console.log('Creating new memorial profile:', data);
-      const profileId = await createProfile({
+      const { db } = await getFirebaseServices();
+      if (!db) return;
+
+      const profileId = crypto.randomUUID();
+      const profileRef = doc(db, `universities/${org}/profiles`, profileId);
+
+      await setDoc(profileRef, {
+        id: profileId,
         universityId: org as string,
         type: 'memorial',
         status: 'draft',
@@ -28,26 +36,26 @@ export default function NewMemorialPage() {
         description: data.description || '',
         imageUrl: data.imageUrl || '',
         basicInfo: {
-          dateOfBirth: data.basicInfo.dateOfBirth instanceof Timestamp ? data.basicInfo.dateOfBirth : Timestamp.fromDate(new Date(data.basicInfo.dateOfBirth)),
-          dateOfDeath: data.basicInfo.dateOfDeath instanceof Timestamp ? data.basicInfo.dateOfDeath : Timestamp.fromDate(new Date(data.basicInfo.dateOfDeath)),
+          dateOfBirth: data.basicInfo.dateOfBirth 
+            ? (data.basicInfo.dateOfBirth instanceof Timestamp 
+              ? data.basicInfo.dateOfBirth 
+              : Timestamp.fromDate(new Date(data.basicInfo.dateOfBirth)))
+            : null,
+          dateOfDeath: data.basicInfo.dateOfDeath
+            ? (data.basicInfo.dateOfDeath instanceof Timestamp
+              ? data.basicInfo.dateOfDeath
+              : Timestamp.fromDate(new Date(data.basicInfo.dateOfDeath)))
+            : null,
           biography: data.basicInfo.biography,
           photo: data.basicInfo.photo,
           birthLocation: data.basicInfo.birthLocation,
           deathLocation: data.basicInfo.deathLocation,
-        } as {
-          dateOfBirth?: Date | Timestamp;
-          dateOfDeath?: Date | Timestamp;
-          biography?: string;
-          photo?: string;
-          birthLocation?: string;
-          deathLocation?: string;
         },
         lifeStory: data.lifeStory ? {
           content: data.lifeStory.content,
-          updatedAt: data.lifeStory.updatedAt instanceof Timestamp ? data.lifeStory.updatedAt : Timestamp.fromDate(new Date(data.lifeStory.updatedAt)),
-        } as {
-          content?: string;
-          updatedAt?: Date | Timestamp;
+          updatedAt: data.lifeStory.updatedAt instanceof Timestamp 
+            ? data.lifeStory.updatedAt 
+            : Timestamp.fromDate(new Date(data.lifeStory.updatedAt))
         } : undefined,
         isPublic: false,
         metadata: {
