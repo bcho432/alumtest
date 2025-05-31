@@ -41,8 +41,7 @@ export default function StoriatsAdminSettingsPage() {
       }
 
       try {
-        const adminStatus = await isStoriatsAdmin(user.email);
-        console.log('Admin check result:', adminStatus);
+        const adminStatus = isStoriatsAdmin(user.email);
         setIsAdmin(adminStatus);
         if (adminStatus) {
           await refreshSettings();

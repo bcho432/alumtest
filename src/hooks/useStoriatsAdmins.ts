@@ -51,7 +51,7 @@ export const useStoriatsAdmins = () => {
           return cachedSettings;
         }
 
-        setLoading(true); // Set loading state before fetch
+        setLoading(true);
         const { db } = await getFirebaseServices();
         if (!db) throw new Error('Firestore instance not available');
 
@@ -204,25 +204,10 @@ export const useStoriatsAdmins = () => {
     }
   };
 
-  const isStoriatsAdmin = useCallback(async (email: string) => {
-    if (!email) {
-      console.log('No email provided for admin check');
-      return false;
-    }
-
-    // Ensure settings are loaded
-    if (!settings) {
-      console.log('Settings not loaded for admin check, fetching...');
-      await fetchSettings(true);
-    }
-
-    const normalizedEmail = email.toLowerCase();
-    console.log('Checking admin status for:', normalizedEmail);
-    console.log('Available admins:', settings?.adminEmails || []);
-    const isAdmin = settings?.adminEmails.includes(normalizedEmail) ?? false;
-    console.log('Admin check result:', isAdmin);
-    return isAdmin;
-  }, [settings, fetchSettings]);
+  const isStoriatsAdmin = useCallback((email: string) => {
+    if (!email || !settings) return false;
+    return settings.adminEmails.includes(email.toLowerCase());
+  }, [settings]);
 
   // Initial fetch
   useEffect(() => {
