@@ -118,7 +118,7 @@ export default function StoriatsAdminSettingsPage() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
         <Card className="max-w-md w-full p-6">
           <div className="text-center">
-            <Icon name="shield-exclamation" className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <Icon name="alert-circle" className="w-12 h-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
             <p className="text-gray-600 mb-4">You do not have permission to access this page</p>
           </div>
