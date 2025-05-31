@@ -14,12 +14,6 @@ import { getDb } from '@/lib/firebase';
 import { Icon } from '@/components/ui/Icon';
 import Link from 'next/link';
 
-const STORIATS_ADMIN_EMAILS = [
-  'matthew.bo@storiats.com',
-  'derek.lee@storiats.com',
-  'justin.lontoh@storiats.com'
-];
-
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,13 +24,26 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user) {
-      // Simple redirect based on email for Storiats admins
-      if (STORIATS_ADMIN_EMAILS.includes(user.email || '')) {
-        router.push('/admin');
-        return;
-      }
-      // Default redirect to dashboard
-        router.push('/dashboard');
+      // Check if user is a Storiats admin
+      const checkAdminStatus = async () => {
+        try {
+          const db = await getDb();
+          const adminSettingsDoc = await getDoc(doc(db, 'adminSettings', 'storiatsAdmins'));
+          const adminEmails = adminSettingsDoc.exists() ? adminSettingsDoc.data().adminEmails : [];
+          
+          if (adminEmails.includes(user.email?.toLowerCase() || '')) {
+            router.push('/admin');
+            return;
+          }
+          // Default redirect to dashboard
+          router.push('/dashboard');
+        } catch (error) {
+          console.error('Error checking admin status:', error);
+          router.push('/dashboard');
+        }
+      };
+      
+      checkAdminStatus();
     }
   }, [user, router]);
 

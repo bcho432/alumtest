@@ -84,7 +84,7 @@ export function useCreateProfile() {
           tags: params.metadata?.tags || [],
           categories: params.metadata?.categories || [],
           lastModifiedBy: params.metadata?.lastModifiedBy || params.updatedBy,
-          lastModifiedAt: params.metadata?.lastModifiedAt || Timestamp.now().toDate().toISOString(),
+          lastModifiedAt: Timestamp.now().toDate().toISOString(),
           version: params.metadata?.version || 1
         }
       };
@@ -100,8 +100,8 @@ export function useCreateProfile() {
           description: params.description || '',
           imageUrl: params.imageUrl || '',
           basicInfo: {
-            dateOfBirth: params.basicInfo?.dateOfBirth || new Date(),
-            dateOfDeath: params.basicInfo?.dateOfDeath || new Date(),
+            dateOfBirth: params.basicInfo?.dateOfBirth ? new Date(params.basicInfo.dateOfBirth) : new Date(),
+            dateOfDeath: params.basicInfo?.dateOfDeath ? new Date(params.basicInfo.dateOfDeath) : new Date(),
             biography: params.basicInfo?.biography || '',
             photo: params.basicInfo?.photo || '',
             birthLocation: params.basicInfo?.birthLocation || '',
@@ -109,7 +109,7 @@ export function useCreateProfile() {
           },
           lifeStory: {
             content: params.lifeStory?.content || '',
-            updatedAt: params.lifeStory?.updatedAt || new Date()
+            updatedAt: params.lifeStory?.updatedAt ? new Date(params.lifeStory.updatedAt) : new Date()
           }
         } as MemorialProfile;
       } else {

@@ -3,37 +3,29 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { 
   User as FirebaseUser,
-  Auth,
-  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { firebaseAuth, firebaseDb, getDb } from '@/lib/firebase';
-import { validateEmail, validatePassword, checkRateLimit, resetRateLimit } from '@/lib/validation';
-import { FirebaseError } from 'firebase/app';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { getDb, getFirebaseServices } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
 import type { AuthContextType, SignUpFormData, SignInFormData, UserRoles, UserProfile } from '@/types/auth';
+import { useStoriatsAdmins } from '@/hooks/useStoriatsAdmins';
+import { validateEmail, checkRateLimit, resetRateLimit } from '@/lib/validation';
+import { FirebaseError } from 'firebase/app';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
-
-const STORIATS_ADMIN_EMAILS = [
-  'matthew.bo@storiats.com',
-  'derek.lee@storiats.com',
-  'justin.lontoh@storiats.com'
-];
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [auth, setAuth] = useState<Auth | null>(null);
   const [initializing, setInitializing] = useState(true);
-  const [retryCount, setRetryCount] = useState(0);
   const [lastError, setLastError] = useState<Error | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [userRoles, setUserRoles] = useState<UserRoles>({
@@ -45,35 +37,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { toast } = useToast();
 
-  // Handle initial auth state with error recovery
+  const { isStoriatsAdmin } = useStoriatsAdmins();
+
   useEffect(() => {
     const initAuth = async () => {
       try {
-        if (!firebaseAuth) {
-          console.error('Firebase Auth is not initialized. Please check your environment variables.');
-          setInitializing(false);
-          setLoading(false);
-          return;
+        const { auth } = await getFirebaseServices();
+        if (!auth) {
+          throw new Error('Firebase Auth is not initialized');
         }
 
-        setAuth(firebaseAuth);
-
-        return onAuthStateChanged(firebaseAuth, async (user) => {
+        return onAuthStateChanged(auth, async (user) => {
           console.log('Auth state changed:', user?.uid);
           setUser(user);
           
           if (user) {
-            const db = await getDb();
-            const userDoc = await getDoc(doc(db, 'users', user.uid));
-            if (userDoc.exists()) {
-              const userData = userDoc.data();
-              const isUserAdmin = userData.isAdmin || STORIATS_ADMIN_EMAILS.includes(user.email || '');
-              setIsAdmin(isUserAdmin);
+            try {
+              const db = await getDb();
+              const userDoc = await getDoc(doc(db, 'users', user.uid));
+              
+              if (userDoc.exists()) {
+                const userData = userDoc.data();
+                // First check local admin status
+                const isLocalAdmin = userData.isAdmin || false;
+                
+                // Then check Storiats admin status
+                const isStoriatsAdminUser = user.email ? isStoriatsAdmin(user.email.toLowerCase()) : false;
+                
+                const isUserAdmin = isLocalAdmin || isStoriatsAdminUser;
+                
+                console.log('Admin status check:', {
+                  email: user.email,
+                  isLocalAdmin,
+                  isStoriatsAdminUser,
+                  isUserAdmin
+                });
+                
+                setIsAdmin(isUserAdmin);
+                setUserRoles({
+                  isAdmin: isUserAdmin,
+                  profileRoles: userData.profileRoles || {},
+                  isLoading: false,
+                  error: null
+                });
+              } else {
+                // Handle case where user document doesn't exist
+                console.warn('User document not found for:', user.uid);
+                setIsAdmin(false);
+                setUserRoles({
+                  isAdmin: false,
+                  profileRoles: {},
+                  isLoading: false,
+                  error: new Error('User profile not found')
+                });
+              }
+            } catch (error) {
+              console.error('Error checking admin status:', error);
+              setIsAdmin(false);
               setUserRoles({
-                isAdmin: isUserAdmin,
-                profileRoles: userData.profileRoles || {},
+                isAdmin: false,
+                profileRoles: {},
                 isLoading: false,
-                error: null
+                error: error instanceof Error ? error : new Error('Failed to check admin status')
               });
             }
           } else {
@@ -108,10 +133,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         unsubscribe.then(unsub => unsub && unsub());
       }
     };
-  }, []);
+  }, [isStoriatsAdmin]);
 
   const signIn = async (data: SignInFormData) => {
-    if (!firebaseAuth) {
+    const { auth } = await getFirebaseServices();
+    if (!auth) {
       throw new Error('Firebase Auth is not initialized. Please check your environment variables.');
     }
 
@@ -127,16 +153,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(firebaseAuth, data.email, data.password);
+      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
       // Reset rate limit on successful sign in
       resetRateLimit(`signin_${data.email}`);
       
       // Check admin status
       const db = await getDb();
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        setIsAdmin(userData.isAdmin || STORIATS_ADMIN_EMAILS.includes(userCredential.user.email || ''));
+        setIsAdmin(userData.isAdmin || isStoriatsAdmin(userCredential.user.email?.toLowerCase() || ''));
       }
       
       return userCredential.user;
@@ -151,17 +178,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUp = async (data: SignUpFormData): Promise<FirebaseUser> => {
-    if (!firebaseAuth) {
+  const signUp = async (data: SignUpFormData) => {
+    const { auth } = await getFirebaseServices();
+    if (!auth) {
       throw new Error('Firebase Auth is not initialized. Please check your environment variables.');
     }
 
     // Validate inputs
     const emailError = validateEmail(data.email);
     if (emailError) throw new Error(emailError);
-
-    const passwordError = validatePassword(data.password);
-    if (passwordError) throw new Error(passwordError);
 
     // Check rate limiting
     const rateLimitResult = checkRateLimit(`signup_${data.email}`);
@@ -170,36 +195,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setLoading(true);
-    
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        firebaseAuth,
-        data.email,
-        data.password
-      );
-
-      const db = await getDb();
-      const user = userCredential.user;
-      const isUserAdmin = STORIATS_ADMIN_EMAILS.includes(user.email || '');
-
-      // Create user profile
-      await setDoc(doc(db, 'users', user.uid), {
-        email: user.email,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        displayName: data.email.split('@')[0], // Default display name from email
-        photoURL: null,
-        isAdmin: isUserAdmin
-      });
-
-      setIsAdmin(isUserAdmin);
-
-      // Reset rate limit on successful signup
+      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      // Reset rate limit on successful sign up
       resetRateLimit(`signup_${data.email}`);
       
-      toast('Account created successfully', 'success');
+      // Create user document
+      const db = await getDb();
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        email: data.email,
+        isAdmin: false,
+        profileRoles: {},
+        createdAt: new Date()
+      });
       
-      return user;
+      return userCredential.user;
     } catch (error) {
       console.error('Sign up error:', error);
       if (error instanceof FirebaseError) {
@@ -212,16 +222,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    if (!firebaseAuth) {
-      throw new Error('Firebase Auth is not initialized. Please check your environment variables.');
+    const { auth } = await getFirebaseServices();
+    if (!auth) {
+      throw new Error('Firebase Auth is not initialized');
     }
 
     try {
-      await firebaseSignOut(firebaseAuth);
+      await firebaseSignOut(auth);
       setUser(null);
       setIsAdmin(false);
+      setUserRoles({
+        isAdmin: false,
+        profileRoles: {},
+        isLoading: false,
+        error: null
+      });
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('Sign out error:', error);
+      if (error instanceof FirebaseError) {
+        throw new Error(error.message);
+      }
       throw error;
     }
   };
