@@ -17,12 +17,27 @@ export default function NewMemorialPage() {
   const { user } = useAuth();
   const { createProfile } = useCreateProfile();
 
+  console.log('[NewMemorialPage] Rendering page for org:', org);
+
   const handleSubmit = async (data: MemorialProfileFormData) => {
+    console.log('[NewMemorialPage] Form submission started with data:', {
+      name: data.name,
+      type: data.type,
+      hasBasicInfo: !!data.basicInfo,
+      hasLifeStory: !!data.lifeStory,
+      timelineEvents: data.timeline?.length || 0
+    });
+
     try {
       const { db } = await getFirebaseServices();
-      if (!db) return;
+      if (!db) {
+        console.error('[NewMemorialPage] Firebase DB not initialized');
+        return;
+      }
 
       const profileId = crypto.randomUUID();
+      console.log('[NewMemorialPage] Generated profile ID:', profileId);
+      
       const profileRef = doc(db, `universities/${org}/profiles`, profileId);
 
       await setDoc(profileRef, {
@@ -67,15 +82,17 @@ export default function NewMemorialPage() {
         }
       });
       
+      console.log('[NewMemorialPage] Profile created successfully, redirecting to edit page');
       toast.success('Memorial profile created successfully');
       router.push(`/${org}/memorials/${profileId}/edit`);
     } catch (error) {
-      console.error('Error creating memorial profile:', error);
+      console.error('[NewMemorialPage] Error creating memorial profile:', error);
       toast.error('Failed to create memorial profile');
     }
   };
 
   const handleCancel = () => {
+    console.log('[NewMemorialPage] Cancel button clicked, navigating back');
     router.back();
   };
 

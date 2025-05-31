@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useLayoutEffect, useCallback, useRef } from 'react';
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { getFirebaseServices } from '@/lib/firebase';
 import { useToast } from '@/components/ui/use-toast';
@@ -140,8 +140,8 @@ export const useStoriatsAdmins = () => {
     }
   }, [toast]);
 
-  // Add useEffect to fetch settings on mount
-  useEffect(() => {
+  // Add useLayoutEffect to fetch settings on mount
+  useLayoutEffect(() => {
     console.log('[useStoriatsAdmins] Initializing settings fetch');
     fetchSettings().catch(error => {
       console.error('[useStoriatsAdmins] Error during initial fetch:', error);

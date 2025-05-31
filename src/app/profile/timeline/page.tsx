@@ -1,10 +1,10 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import { TimelineBuilder } from '@/components/timeline/TimelineBuilder';
 import { TimelineView } from '@/components/timeline/TimelineView';
 import { useTimeline } from '@/hooks/useTimeline';
 import { useParams } from 'next/navigation';
-import { TimelineEvent } from '@/types/profile';
+import { TimelineEvent, LifeEvent } from '@/types/profile';
 
 export default function TimelinePage() {
   const params = useParams() || {};
@@ -23,8 +23,11 @@ export default function TimelinePage() {
     profileId: profileId || '',
   });
 
+  const [localEvents, setLocalEvents] = useState<LifeEvent[]>([]);
+
   // Handler to update the entire timeline
-  const handleUpdateTimeline = async (events: TimelineEvent[]) => {
+  const handleUpdateTimeline = async (updatedEvents: LifeEvent[]) => {
+    setLocalEvents(updatedEvents);
     // Update the events in the cache
     await refresh();
   };
@@ -48,9 +51,12 @@ export default function TimelinePage() {
         <div>
           <h1 className="text-2xl font-bold mb-8">Timeline Builder</h1>
           <TimelineBuilder
-            existingEvents={events}
-            onUpdate={handleUpdateTimeline}
-            isSubmitting={isLoading || isRefreshing}
+            initialEvents={localEvents}
+            onEventsChange={handleUpdateTimeline}
+            orgId={orgId}
+            profileId={profileId}
+            isEditMode={true}
+            isPreview={false}
           />
         </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -39,6 +39,10 @@ export const SimpleTimelineBuilder: React.FC<SimpleTimelineBuilderProps> = ({
 }) => {
   const [events, setEvents] = useState<TimelineEvent[]>(existingEvents);
   const { showToast } = useToast();
+
+  useEffect(() => {
+    setEvents(existingEvents);
+  }, [existingEvents]);
 
   const {
     register,
@@ -278,64 +282,36 @@ export const SimpleTimelineBuilder: React.FC<SimpleTimelineBuilderProps> = ({
       ) : (
         <div className="space-y-4">
           {events.map((event) => (
-            <motion.div
-              key={event.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-            >
-              <Card className="p-4">
-                <div className="flex justify-between items-start">
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Icon
-                        name={
-                          event.type === 'education'
-                            ? 'graduation-cap'
-                            : event.type === 'job'
-                            ? 'briefcase'
-                            : 'calendar'
-                        }
-                        className="w-5 h-5 text-gray-500"
-                      />
-                      <h3 className="text-lg font-medium">{event.title}</h3>
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {new Date(event.startDate).toLocaleDateString()}
-                      {event.endDate && ` - ${new Date(event.endDate).toLocaleDateString()}`}
-                    </div>
-                    {event.location && (
-                      <div className="text-sm text-gray-500">
-                        <Icon name="map-pin" className="w-4 h-4 inline mr-1" />
-                        {event.location}
-                      </div>
-                    )}
-                    {event.description && (
-                      <p className="text-sm text-gray-700 mt-2">{event.description}</p>
-                    )}
-                    {event.metadata?.institution && (
-                      <div className="text-sm text-gray-500">
-                        <Icon name="building" className="w-4 h-4 inline mr-1" />
-                        {event.metadata.institution}
-                      </div>
-                    )}
-                    {event.metadata?.company && (
-                      <div className="text-sm text-gray-500">
-                        <Icon name="building" className="w-4 h-4 inline mr-1" />
-                        {event.metadata.company}
-                      </div>
-                    )}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteEvent(event.id)}
-                  >
-                    <Icon name="trash" className="w-4 h-4 text-red-500" />
-                  </Button>
+            <Card key={event.id} className="p-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-semibold">{event.title}</h3>
+                  <p className="text-sm text-gray-600">
+                    {event.startDate} {event.endDate ? `- ${event.endDate}` : ''}
+                  </p>
+                  {event.location && (
+                    <p className="text-sm text-gray-600">{event.location}</p>
+                  )}
+                  {event.description && (
+                    <p className="mt-2 text-sm">{event.description}</p>
+                  )}
+                  {event.metadata?.institution && (
+                    <p className="text-sm text-gray-600">{event.metadata.institution}</p>
+                  )}
+                  {event.metadata?.company && (
+                    <p className="text-sm text-gray-600">{event.metadata.company}</p>
+                  )}
                 </div>
-              </Card>
-            </motion.div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDeleteEvent(event.id)}
+                  disabled={isSubmitting}
+                >
+                  <Icon name="trash" className="h-4 w-4" />
+                </Button>
+              </div>
+            </Card>
           ))}
         </div>
       )}

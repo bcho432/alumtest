@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { getFirebaseServices } from '@/lib/firebase';
-import { collection, doc, setDoc, Timestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, Timestamp, writeBatch } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { MemorialProfile, PersonalProfile } from '../types/profile';
 import { useAuth } from './useAuth';
@@ -17,8 +17,8 @@ interface CreateProfileParams {
   description?: string;
   imageUrl?: string;
   basicInfo?: {
-    dateOfBirth?: Date | Timestamp;
-    dateOfDeath?: Date | Timestamp;
+    dateOfBirth?: Date | Timestamp | null;
+    dateOfDeath?: Date | Timestamp | null;
     biography?: string;
     photo?: string;
     birthLocation?: string;
@@ -134,7 +134,27 @@ export function useCreateProfile() {
       }
 
       console.log('useCreateProfile: Saving profile data', profileData);
-      await setDoc(profileRef, profileData);
+      
+      // Use a batch write to ensure atomic updates
+      const batch = writeBatch(db);
+      
+      // Create the main profile document
+      batch.set(profileRef, profileData);
+      
+      // Initialize the timeline subcollection with an empty document
+      const timelineRef = collection(db, collectionPath, profileId, 'timeline');
+      const initialTimelineDoc = doc(timelineRef);
+      batch.set(initialTimelineDoc, {
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+        type: 'initialization',
+        title: 'Profile Created',
+        description: 'Profile timeline initialized',
+        startDate: Timestamp.now().toDate().toISOString(),
+      });
+      
+      // Commit the batch
+      await batch.commit();
 
       // Track the event
       trackEvent('profile_created', {

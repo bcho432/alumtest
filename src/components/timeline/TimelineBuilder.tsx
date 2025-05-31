@@ -6,7 +6,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { TimelineEvent } from '@/types/profile';
-import { useToast } from '@/hooks/useToast';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -17,6 +16,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { format } from 'date-fns';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { EventCard } from './EventCard';
+import { EventForm } from './EventForm';
+import { LifeEvent, TimelineBuilderProps } from '@/types/profile';
+import { useTimelineEvents } from '@/hooks/useTimelineEvents';
+import { useTimelineAutoSave } from '@/hooks/useTimelineAutoSave';
+import { Alert } from '@/components/ui/Alert';
+import { LoadingState } from '@/components/ui/LoadingState';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Tooltip } from '@/components/ui/Tooltip';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { TimelineView } from './TimelineView';
+import { DatePicker } from '@/components/ui/DatePicker';
 
 // Error Boundary Component
 class TimelineErrorBoundary extends React.Component<
@@ -49,7 +60,7 @@ type IconName = 'briefcase' | 'graduation-cap' | 'calendar' | 'spinner' | 'x' | 
 
 // Update template type with strict icon typing
 type EventTemplate = {
-  type: 'education' | 'job' | 'event';
+  type: 'education' | 'work' | 'other';
   icon: IconName;
   label: string;
   color: string;
@@ -58,7 +69,7 @@ type EventTemplate = {
 
 // Fix date validation schema
 const timelineEventSchema = z.object({
-  type: z.enum(['education', 'job', 'event']),
+  type: z.enum(['education', 'work', 'other']),
   title: z.string().min(1, 'Title is required').max(100, 'Title must be less than 100 characters'),
   startDate: z.string().min(1, 'Start date is required'),
   endDate: z.string().optional()
@@ -84,113 +95,21 @@ const timelineEventSchema = z.object({
 
 type TimelineEventFormData = z.infer<typeof timelineEventSchema>;
 
-interface TimelineBuilderProps {
-  existingEvents?: TimelineEvent[];
-  onUpdate: (events: TimelineEvent[]) => Promise<void>;
-  isSubmitting?: boolean;
+interface ExtendedTimelineBuilderProps extends TimelineBuilderProps {
+  orgId: string;
+  profileId: string;
+  isEditMode?: boolean;
+  isPreview?: boolean;
 }
-
-// Memoized Event Card Component
-const EventCard = memo(({ 
-  event, 
-  onEdit, 
-  onDelete, 
-  isDeleting 
-}: { 
-  event: TimelineEvent; 
-  onEdit: (event: TimelineEvent) => void; 
-  onDelete: (id: string) => void;
-  isDeleting: string | null;
-}) => (
-  <Card className="p-4">
-    <div className="flex justify-between items-start">
-      <div className="space-y-2">
-        <div className="flex items-center space-x-2">
-          <Icon
-            name={
-              event.type === 'education'
-                ? 'graduation-cap'
-                : event.type === 'job'
-                ? 'briefcase'
-                : 'calendar'
-            }
-            className="w-5 h-5 text-gray-500"
-          />
-          <h3 className="text-lg font-medium">{event.title}</h3>
-        </div>
-        <div className="text-sm text-gray-500">
-          {(() => {
-            try {
-              return format(new Date(event.startDate), 'MMM d, yyyy');
-            } catch (error) {
-              return 'Invalid date';
-            }
-          })()}
-          {event.endDate && (() => {
-            try {
-              return ` - ${format(new Date(event.endDate), 'MMM d, yyyy')}`;
-            } catch (error) {
-              return ' - Invalid date';
-            }
-          })()}
-        </div>
-        {event.location && (
-          <div className="text-sm text-gray-500">
-            <Icon name="map-pin" className="w-4 h-4 inline mr-1" />
-            {event.location}
-          </div>
-        )}
-        {event.description && (
-          <p className="text-sm text-gray-700 mt-2">{event.description}</p>
-        )}
-        {event.metadata?.institution && (
-          <div className="text-sm text-gray-500">
-            <Icon name="building" className="w-4 h-4 inline mr-1" />
-            {event.metadata.institution}
-          </div>
-        )}
-        {event.metadata?.company && (
-          <div className="text-sm text-gray-500">
-            <Icon name="building" className="w-4 h-4 inline mr-1" />
-            {event.metadata.company}
-          </div>
-        )}
-      </div>
-      <div className="flex space-x-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onEdit(event)}
-        >
-          <Icon name="edit" className="w-4 h-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onDelete(event.id)}
-          disabled={isDeleting === event.id}
-        >
-          {isDeleting === event.id ? (
-            <Icon name="spinner" className="w-4 h-4 animate-spin" />
-          ) : (
-            <Icon name="trash" className="w-4 h-4 text-red-500" />
-          )}
-        </Button>
-      </div>
-    </div>
-  </Card>
-));
-
-EventCard.displayName = 'EventCard';
 
 const EVENT_TEMPLATES: EventTemplate[] = [
   {
-    type: 'job',
+    type: 'work',
     icon: 'briefcase',
     label: 'Add Job',
-    color: 'bg-blue-50 text-blue-700 hover:bg-blue-100',
+    color: 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200',
     defaultFields: {
-      type: 'job',
+      type: 'work',
       title: '',
       startDate: new Date().toISOString().split('T')[0],
     }
@@ -199,7 +118,7 @@ const EVENT_TEMPLATES: EventTemplate[] = [
     type: 'education',
     icon: 'graduation-cap',
     label: 'Add Education',
-    color: 'bg-green-50 text-green-700 hover:bg-green-100',
+    color: 'bg-green-50 text-green-700 hover:bg-green-100 border-green-200',
     defaultFields: {
       type: 'education',
       title: '',
@@ -207,447 +126,285 @@ const EVENT_TEMPLATES: EventTemplate[] = [
     }
   },
   {
-    type: 'event',
+    type: 'other',
     icon: 'calendar',
     label: 'Add Event',
-    color: 'bg-purple-50 text-purple-700 hover:bg-purple-100',
+    color: 'bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200',
     defaultFields: {
-      type: 'event',
+      type: 'other',
       title: '',
       startDate: new Date().toISOString().split('T')[0],
     }
   }
 ];
 
-export const TimelineBuilder: React.FC<TimelineBuilderProps> = ({
-  existingEvents = [],
-  onUpdate,
-  isSubmitting = false,
-}): React.ReactElement => {
-  const [events, setEvents] = useState<TimelineEvent[]>(existingEvents);
-  const eventsRef = useRef(events);
-  const [isFormExpanded, setIsFormExpanded] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<TimelineEvent | null>(null);
-  const [isDeleting, setIsDeleting] = useState<string | null>(null);
-  const [isReordering, setIsReordering] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<EventTemplate | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const { showToast } = useToast();
-  const { trackEvent } = useAnalytics();
-  const parentRef = useRef<HTMLDivElement>(null);
+export const TimelineBuilder: React.FC<ExtendedTimelineBuilderProps> = ({
+  initialEvents = [],
+  onEventsChange,
+  onNext,
+  orgId,
+  profileId,
+  isEditMode = false,
+  isPreview = false,
+}) => {
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<LifeEvent | undefined>();
+  const [events, setEvents] = useState<LifeEvent[]>([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+  const [selectedEventType, setSelectedEventType] = useState<'education' | 'work' | 'other' | undefined>();
+  const [formData, setFormData] = useState<Partial<LifeEvent>>({});
 
   const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors, isSubmitting: isFormSubmitting, isDirty },
-  } = useForm<TimelineEventFormData>({
-    resolver: zodResolver(timelineEventSchema),
-    mode: 'onChange',
+    events: fetchedEvents,
+    isLoading,
+    refetch
+  } = useTimelineEvents({
+    orgId,
+    profileId,
   });
 
-  const eventType = watch('type');
+  // Use local events for preview, fetched events for edit mode
+  const eventsToUse = isEditMode ? fetchedEvents : events;
 
-  // Setup virtualizer
-  const rowVirtualizer = useVirtualizer({
-    count: events.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 100,
-    overscan: 5,
+  const { isSaving, lastSavedAt } = useTimelineAutoSave({
+    orgId,
+    profileId,
+    events: eventsToUse,
   });
 
-  // Update ref when events change
+  // Update parent component when events change, but don't trigger validation
   useEffect(() => {
-    eventsRef.current = events;
-  }, [events]);
-
-  // Memoize template selection handler
-  const handleTemplateSelect = useCallback((template: EventTemplate) => {
-    setIsLoading(true);
-    setSelectedTemplate(template);
-    setIsFormExpanded(true);
-    reset(template.defaultFields);
-    // Simulate a small delay for smooth animation
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 100);
-  }, [reset]);
-
-  // Improved keyboard navigation
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      // Only handle keyboard shortcuts when form is not expanded
-      if (isFormExpanded) return;
-
-      if (e.key === 'n' && e.ctrlKey) {
-        e.preventDefault();
-        // Select the first template by default
-        handleTemplateSelect(EVENT_TEMPLATES[0]);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [isFormExpanded, handleTemplateSelect]);
-
-  // Reset form when it collapses
-  useEffect(() => {
-    if (!isFormExpanded) {
-      reset();
-      setEditingEvent(null);
-      setSelectedTemplate(null);
+    if (onEventsChange) {
+      onEventsChange(events);
     }
-  }, [isFormExpanded, reset]);
+  }, [events, onEventsChange]);
 
-  // Handle form cancel with confirmation if dirty
-  const handleCancel = useCallback(() => {
-    if (isDirty) {
-      if (window.confirm('You have unsaved changes. Are you sure you want to cancel?')) {
-        setIsFormExpanded(false);
-      }
-    } else {
-      setIsFormExpanded(false);
-    }
-  }, [isDirty]);
+  const handleDragEnd = (result: any) => {
+    if (!result.destination) return;
 
-  const handleCreateEvent = useCallback(async (data: TimelineEventFormData) => {
-    const originalEvents = eventsRef.current;
-    try {
-      setIsLoading(true);
-      const newEvent: TimelineEvent = {
-        id: editingEvent?.id || crypto.randomUUID(),
-        type: data.type,
-        title: data.title,
-        startDate: data.startDate,
-        endDate: data.endDate || undefined,
-        location: data.location,
-        description: data.description,
-        createdAt: editingEvent?.createdAt || new Date(),
-        updatedAt: new Date(),
-        metadata: {
-          ...(data.type === 'education' && {
-            institution: data.institution,
-            degree: data.degree,
-          }),
-          ...(data.type === 'job' && {
-            company: data.company,
-            position: data.position,
-          }),
-        },
-      };
+    const items = Array.from(eventsToUse);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
 
-      // Optimistically update UI
-      const updatedEvents = editingEvent
-        ? originalEvents.map((e) => (e.id === editingEvent.id ? newEvent : e))
-        : [...originalEvents, newEvent];
+    setEvents(items);
+  };
 
-      // Sort events by date
-      updatedEvents.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+  const handleAddEvent = (type: 'education' | 'work' | 'other') => {
+    setSelectedEvent(undefined);
+    setSelectedEventType(type);
+    setFormData({
+      type,
+      title: '',
+      startDate: new Date().toISOString().split('T')[0],
+    });
+  };
 
-      // Update UI first
-      setEvents(updatedEvents);
-      
-      // Then update backend
-      await onUpdate(updatedEvents);
-      
-      setIsFormExpanded(false);
-      showToast({
-        title: editingEvent ? 'Event updated' : 'Event added',
-        description: `Successfully ${editingEvent ? 'updated' : 'added'} ${data.title}`,
-        status: 'success',
-      });
-      trackEvent('timeline_event_updated', {
-        event_type: data.type,
-        action: editingEvent ? 'update' : 'create',
-      });
-    } catch (error) {
-      // Revert UI on error using the ref
-      setEvents(originalEvents);
-      console.error('Error saving event:', error);
-      showToast({
-        title: 'Error',
-        description: 'Failed to save event. Please try again.',
-        status: 'error',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [editingEvent, onUpdate, showToast, trackEvent]);
+  const handleEditEvent = (event: LifeEvent) => {
+    setSelectedEvent(event);
+    setSelectedEventType(event.type);
+    setFormData(event);
+  };
 
-  const handleDeleteEvent = useCallback(async (id: string) => {
-    const originalEvents = eventsRef.current;
-    try {
-      setIsDeleting(id);
-      // Store the event being deleted for potential restoration
-      const eventToDelete = originalEvents.find(e => e.id === id);
-      if (!eventToDelete) return;
+  const handleDeleteEvent = (event: LifeEvent) => {
+    setEvents(events.filter((e) => e.id !== event.id));
+  };
 
-      // Optimistically update UI
-      const updatedEvents = originalEvents.filter((e) => e.id !== id);
-      setEvents(updatedEvents);
+  const handleFormChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
-      // Update backend
-      await onUpdate(updatedEvents);
-      
-      showToast({
-        title: 'Event deleted',
-        description: 'Successfully removed event from timeline',
-        status: 'success',
-      });
-      trackEvent('timeline_event_deleted');
-    } catch (error) {
-      // Revert UI on error using the ref
-      setEvents(originalEvents);
-      console.error('Error deleting event:', error);
-      showToast({
-        title: 'Error',
-        description: 'Failed to delete event. Please try again.',
-        status: 'error',
-      });
-    } finally {
-      setIsDeleting(null);
-    }
-  }, [onUpdate, showToast, trackEvent]);
-
-  const handleEditEvent = useCallback((event: TimelineEvent) => {
-    setEditingEvent(event);
-    setValue('type', event.type);
-    setValue('title', event.title);
-    setValue('startDate', event.startDate);
-    setValue('endDate', event.endDate || '');
-    setValue('location', event.location || '');
-    setValue('description', event.description || '');
-    if (event.type === 'education') {
-      setValue('institution', event.metadata?.institution || '');
-      setValue('degree', event.metadata?.degree || '');
-    } else if (event.type === 'job') {
-      setValue('company', event.metadata?.company || '');
-      setValue('position', event.metadata?.position || '');
-    }
-    setIsFormExpanded(true);
-  }, [setValue]);
-
-  const handleDragEnd = useCallback(async (result: DropResult) => {
-    if (!result.destination || result.destination.index === result.source.index) {
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.title || !formData.startDate) {
       return;
     }
 
-    const originalEvents = eventsRef.current;
-    try {
-      setIsReordering(true);
-      const items = Array.from(originalEvents);
-      const [reorderedItem] = items.splice(result.source.index, 1);
-      items.splice(result.destination.index, 0, reorderedItem);
+    const newEvent: LifeEvent = {
+      id: selectedEvent?.id || crypto.randomUUID(),
+      type: formData.type!,
+      title: formData.title,
+      startDate: formData.startDate,
+      endDate: formData.endDate,
+      location: formData.location,
+      description: formData.description,
+      createdAt: selectedEvent?.createdAt || new Date(),
+      updatedAt: new Date(),
+      metadata: {
+        ...(formData.type === 'education' && {
+          institution: formData.metadata?.institution,
+          degree: formData.metadata?.degree,
+        }),
+        ...(formData.type === 'work' && {
+          company: formData.metadata?.company,
+          position: formData.metadata?.position,
+        }),
+      },
+    };
 
-      // Update UI first
-      setEvents(items);
-
-      // Then update backend
-      await onUpdate(items);
-      
-      showToast({
-        title: 'Timeline updated',
-        description: 'Successfully reordered events',
-        status: 'success',
-      });
-      trackEvent('timeline_reordered');
-    } catch (error) {
-      // Revert UI on error using the ref
-      setEvents(originalEvents);
-      console.error('Error reordering events:', error);
-      showToast({
-        title: 'Error',
-        description: 'Failed to reorder events. Please try again.',
-        status: 'error',
-      });
-    } finally {
-      setIsReordering(false);
+    if (selectedEvent) {
+      setEvents(events.map((e) => (e.id === selectedEvent.id ? newEvent : e)));
+    } else {
+      setEvents([...events, newEvent]);
     }
-  }, [onUpdate, showToast, trackEvent]);
+
+    // Reset form
+    setFormData({});
+    setSelectedEventType(undefined);
+    setSelectedEvent(undefined);
+  };
 
   return (
-    <TimelineErrorBoundary>
-      <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Timeline Builder Section */}
+      <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold">Timeline</h2>
-          <div className="text-sm text-gray-500">
-            Press <kbd className="px-2 py-1 bg-gray-100 rounded">Ctrl</kbd> + <kbd className="px-2 py-1 bg-gray-100 rounded">N</kbd> to add an event
+          <h2 className="text-2xl font-bold">Timeline Events</h2>
+          <div className="flex gap-2">
+            {EVENT_TEMPLATES.map((template) => (
+              <Button
+                key={template.type}
+                onClick={() => handleAddEvent(template.type)}
+                className={`${template.color} border`}
+                variant="outline"
+              >
+                <Icon name={template.icon} className="w-4 h-4 mr-2" />
+                {template.label}
+              </Button>
+            ))}
           </div>
         </div>
 
-        {/* Quick Templates */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {EVENT_TEMPLATES.map((template) => (
-            <motion.button
-              key={template.type}
-              onClick={() => handleTemplateSelect(template)}
-              className={`p-4 rounded-lg ${template.color} transition-all duration-200 flex items-center space-x-3 relative`}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              disabled={isLoading}
-            >
-              {isLoading && selectedTemplate?.type === template.type && (
-                <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-50 rounded-lg">
-                  <Icon name="spinner" className="w-6 h-6 animate-spin" />
+        {error && (
+          <Alert
+            type="error"
+            title="Error loading timeline"
+            message={error.message}
+          />
+        )}
+
+        {/* Inline Form */}
+        {selectedEventType && (
+          <Card className="p-4 border-2 border-dashed">
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="Title"
+                  value={formData.title || ''}
+                  onChange={(e) => handleFormChange('title', e.target.value)}
+                  required
+                  placeholder="Enter event title"
+                  error={!formData.title ? 'Title is required' : undefined}
+                />
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Start Date <span className="text-red-500">*</span>
+                  </label>
+                  <DatePicker
+                    value={formData.startDate ? new Date(formData.startDate) : null}
+                    onChange={(date) => handleFormChange('startDate', date?.toISOString().split('T')[0] || '')}
+                    maxDate={new Date()}
+                    required
+                  />
+                  {!formData.startDate && (
+                    <p className="text-sm text-red-500">Start date is required</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    End Date
+                  </label>
+                  <DatePicker
+                    value={formData.endDate ? new Date(formData.endDate) : null}
+                    onChange={(date) => handleFormChange('endDate', date?.toISOString().split('T')[0] || '')}
+                    minDate={formData.startDate ? new Date(formData.startDate) : undefined}
+                    maxDate={new Date()}
+                  />
+                </div>
+                <Input
+                  label="Location"
+                  value={formData.location || ''}
+                  onChange={(e) => handleFormChange('location', e.target.value)}
+                  placeholder="City, Country"
+                />
+              </div>
+
+              {selectedEventType === 'education' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Institution"
+                    value={formData.metadata?.institution || ''}
+                    onChange={(e) => handleFormChange('metadata.institution', e.target.value)}
+                    placeholder="School, University, etc."
+                  />
+                  <Input
+                    label="Degree"
+                    value={formData.metadata?.degree || ''}
+                    onChange={(e) => handleFormChange('metadata.degree', e.target.value)}
+                    placeholder="Bachelor's, Master's, etc."
+                  />
                 </div>
               )}
-              <Icon name={template.icon} className="w-6 h-6" />
-              <span className="font-medium">{template.label}</span>
-            </motion.button>
-          ))}
-        </div>
 
-        {/* Quick Add Form */}
-        <AnimatePresence>
-          {isFormExpanded && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden"
-              transition={{ duration: 0.2 }}
-            >
-              <Card className="p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-2">
-                    {selectedTemplate && (
-                      <>
-                        <Icon name={selectedTemplate.icon} className={`w-5 h-5 ${selectedTemplate.color.split(' ')[1]}`} />
-                        <h3 className="font-medium">{selectedTemplate.label}</h3>
-                      </>
-                    )}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCancel}
-                    disabled={isLoading}
-                  >
-                    <Icon name="x" className="w-4 h-4" />
-                  </Button>
+              {selectedEventType === 'work' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Company"
+                    value={formData.metadata?.company || ''}
+                    onChange={(e) => handleFormChange('metadata.company', e.target.value)}
+                    placeholder="Company or Organization"
+                  />
+                  <Input
+                    label="Position"
+                    value={formData.metadata?.position || ''}
+                    onChange={(e) => handleFormChange('metadata.position', e.target.value)}
+                    placeholder="Job Title or Role"
+                  />
                 </div>
+              )}
 
-                <form onSubmit={handleSubmit(handleCreateEvent)} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Title
-                      </label>
-                      <Input
-                        {...register('title')}
-                        error={errors.title?.message}
-                        placeholder={selectedTemplate?.type === 'job' ? 'e.g., Software Engineer' : 
-                                  selectedTemplate?.type === 'education' ? 'e.g., Bachelor of Science' :
-                                  'e.g., Conference Presentation'}
-                        autoFocus
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Start Date
-                      </label>
-                      <Input
-                        type="date"
-                        {...register('startDate')}
-                        error={errors.startDate?.message}
-                      />
-                    </div>
-                  </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <Textarea
+                  value={formData.description || ''}
+                  onChange={(e) => handleFormChange('description', e.target.value)}
+                  placeholder="Add a brief description..."
+                  className="min-h-[100px]"
+                />
+              </div>
 
-                  {selectedTemplate?.type === 'job' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Company
-                        </label>
-                        <Input
-                          {...register('company')}
-                          error={errors.company?.message}
-                          placeholder="e.g., Google"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Position
-                        </label>
-                        <Input
-                          {...register('position')}
-                          error={errors.position?.message}
-                          placeholder="e.g., Senior Engineer"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedTemplate?.type === 'education' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Institution
-                        </label>
-                        <Input
-                          {...register('institution')}
-                          error={errors.institution?.message}
-                          placeholder="e.g., Stanford University"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Degree
-                        </label>
-                        <Input
-                          {...register('degree')}
-                          error={errors.degree?.message}
-                          placeholder="e.g., Bachelor of Science"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex justify-end space-x-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleCancel}
-                      disabled={isSubmitting || isFormSubmitting || isLoading}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={isSubmitting || isFormSubmitting || isLoading}
-                      className={selectedTemplate?.color.split(' ')[1]}
-                    >
-                      {isFormSubmitting || isLoading ? (
-                        <>
-                          <Icon name="spinner" className="w-4 h-4 mr-2 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        'Save Event'
-                      )}
-                    </Button>
-                  </div>
-                </form>
-              </Card>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Events List */}
-        {events.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-lg">
-            <Icon name="calendar" className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No events yet</h3>
-            <p className="text-gray-500 mb-4">
-              Choose a template above to add your first event
-            </p>
-            <div className="text-sm text-gray-400">
-              Or press <kbd className="px-2 py-1 bg-gray-100 rounded">Ctrl</kbd> + <kbd className="px-2 py-1 bg-gray-100 rounded">N</kbd>
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setFormData({});
+                    setSelectedEventType(undefined);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="button"
+                  onClick={handleFormSubmit}
+                >
+                  {selectedEvent ? 'Update' : 'Add'} Event
+                </Button>
+              </div>
             </div>
-          </div>
+          </Card>
+        )}
+
+        {isLoading ? (
+          <LoadingState />
         ) : (
           <DragDropContext onDragEnd={handleDragEnd}>
             <Droppable droppableId="timeline">
@@ -657,59 +414,27 @@ export const TimelineBuilder: React.FC<TimelineBuilderProps> = ({
                   ref={provided.innerRef}
                   className="space-y-4"
                 >
-                  <div
-                    ref={parentRef}
-                    className="h-[600px] overflow-auto"
-                    style={{
-                      contain: 'strict',
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: `${rowVirtualizer.getTotalSize()}px`,
-                        width: '100%',
-                        position: 'relative',
-                      }}
+                  {events.map((event, index) => (
+                    <Draggable
+                      key={event.id}
+                      draggableId={event.id}
+                      index={index}
                     >
-                      {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                        const event = events[virtualRow.index];
-                        return (
-                          <div
-                            key={event.id}
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              width: '100%',
-                              height: `${virtualRow.size}px`,
-                              transform: `translateY(${virtualRow.start}px)`,
-                            }}
-                          >
-                            <Draggable
-                              draggableId={event.id}
-                              index={virtualRow.index}
-                              isDragDisabled={isReordering}
-                            >
-                              {(provided) => (
-                                <div
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
-                                >
-                                  <EventCard
-                                    event={event}
-                                    onEdit={handleEditEvent}
-                                    onDelete={handleDeleteEvent}
-                                    isDeleting={isDeleting}
-                                  />
-                                </div>
-                              )}
-                            </Draggable>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                      {(provided) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                        >
+                          <EventCard
+                            event={event}
+                            onEdit={handleEditEvent}
+                            onDelete={handleDeleteEvent}
+                          />
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
                   {provided.placeholder}
                 </div>
               )}
@@ -717,6 +442,29 @@ export const TimelineBuilder: React.FC<TimelineBuilderProps> = ({
           </DragDropContext>
         )}
       </div>
-    </TimelineErrorBoundary>
+
+      {/* Timeline Preview Section */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">Timeline Preview</h2>
+        <TimelineView
+          orgId={orgId}
+          profileId={profileId}
+          events={events}
+          onEventClick={(event) => {
+            // Handle event click if needed
+            console.log('Event clicked:', event);
+          }}
+        />
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!showDeleteConfirm}
+        onCancel={() => setShowDeleteConfirm(null)}
+        onConfirm={() => showDeleteConfirm && handleDeleteEvent(selectedEvent!)}
+        title="Delete Event"
+        message="Are you sure you want to delete this event? This action cannot be undone."
+      />
+    </div>
   );
 }; 

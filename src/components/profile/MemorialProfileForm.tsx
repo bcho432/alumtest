@@ -4,7 +4,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Button } from '@/components/ui/Button';
-import { MemorialProfile, MemorialProfileFormData, TimelineEvent } from '@/types/profile';
+import { MemorialProfile, MemorialProfileFormData, TimelineEvent, LifeEvent } from '@/types/profile';
 import { toast } from 'react-hot-toast';
 import { Badge } from '@/components/ui/Badge';
 import { ImageUpload } from '@/components/ui/ImageUpload';
@@ -18,6 +18,8 @@ import { SimpleTimelineBuilder } from '@/components/timeline/SimpleTimelineBuild
 import debounce from 'lodash/debounce';
 import { Timestamp } from 'firebase/firestore';
 import { LifeStoryEditor } from '@/components/profile/LifeStoryEditor';
+import { Select } from '@/components/ui/Select';
+import { TimelineBuilder } from '@/components/timeline/TimelineBuilder';
 
 interface MemorialProfileFormProps {
   profile?: MemorialProfile;
@@ -37,44 +39,57 @@ interface FormErrors {
   deathLocation?: string;
 }
 
+const timelineEventToLifeEvent = (event: any) => ({
+  ...event,
+  type: event.type === 'job' ? 'work' : event.type === 'event' ? 'other' : event.type,
+});
+
 export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
   profile,
   onSubmit,
   onCancel,
   className
 }) => {
-  const [formData, setFormData] = useState<MemorialProfileFormData>({
-    id: '',
-    type: 'memorial',
-    universityId: '',
-    createdAt: Timestamp.now(),
-    updatedAt: Timestamp.now(),
-    createdBy: '',
-    updatedBy: '',
-    name: '',
-    description: '',
-    imageUrl: '',
-    basicInfo: {
-      dateOfBirth: new Date(),
-      dateOfDeath: new Date(),
-      biography: '',
-      photo: '',
-      birthLocation: '',
-      deathLocation: ''
-    },
-    lifeStory: {
-      content: '',
-      updatedAt: new Date()
-    },
-    isPublic: false,
-    status: 'draft',
-    metadata: {
-      tags: [],
-      categories: [],
-      lastModifiedBy: '',
-      lastModifiedAt: Timestamp.fromDate(new Date()),
-      version: 1
-    }
+  console.log('[MemorialProfileForm] Rendering form with profile:', profile?.id || 'new');
+
+  const [formData, setFormData] = useState<MemorialProfileFormData>(() => {
+    console.log('[MemorialProfileForm] Initializing form data with profile:', profile);
+    return {
+      id: profile?.id || '',
+      type: 'memorial',
+      universityId: profile?.universityId || '',
+      createdAt: profile?.createdAt || Timestamp.now(),
+      updatedAt: profile?.updatedAt || Timestamp.now(),
+      createdBy: profile?.createdBy || '',
+      updatedBy: profile?.updatedBy || '',
+      name: profile?.name || '',
+      description: profile?.description || '',
+      imageUrl: profile?.imageUrl || '',
+      basicInfo: {
+        dateOfBirth: profile?.basicInfo?.dateOfBirth || null,
+        dateOfDeath: profile?.basicInfo?.dateOfDeath || null,
+        biography: profile?.basicInfo?.biography || '',
+        photo: profile?.basicInfo?.photo || '',
+        birthLocation: profile?.basicInfo?.birthLocation || '',
+        deathLocation: profile?.basicInfo?.deathLocation || ''
+      },
+      lifeStory: {
+        content: profile?.lifeStory?.content || '',
+        updatedAt: profile?.lifeStory?.updatedAt || new Date()
+      },
+      timeline: Array.isArray(profile?.timeline)
+        ? profile.timeline.map(timelineEventToLifeEvent)
+        : [],
+      isPublic: profile?.isPublic || false,
+      status: profile?.status || 'draft',
+      metadata: {
+        tags: profile?.metadata?.tags || [],
+        categories: profile?.metadata?.categories || [],
+        lastModifiedBy: profile?.metadata?.lastModifiedBy || '',
+        lastModifiedAt: profile?.metadata?.lastModifiedAt || Timestamp.fromDate(new Date()),
+        version: profile?.metadata?.version || 1
+      }
+    };
   });
 
   const [loading, setLoading] = useState(false);
@@ -111,52 +126,60 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
     [onSubmit]
   );
 
-  // Validate form data
-  const validateForm = (data: MemorialProfileFormData): FormErrors => {
-    const newErrors: FormErrors = {};
-    
-    if (!data.name?.trim()) {
-      newErrors.name = 'Name is required';
-    } else if (data.name.length > 100) {
-      newErrors.name = 'Name must be less than 100 characters';
-    }
-
-    if (data.description && data.description.length > 500) {
-      newErrors.description = 'Description must be less than 500 characters';
-    }
-
-    if (data.basicInfo?.dateOfBirth && data.basicInfo?.dateOfDeath) {
-      const birthDate = data.basicInfo.dateOfBirth instanceof Timestamp ? data.basicInfo.dateOfBirth.toDate() : new Date(data.basicInfo.dateOfBirth);
-      const deathDate = data.basicInfo.dateOfDeath instanceof Timestamp ? data.basicInfo.dateOfDeath.toDate() : new Date(data.basicInfo.dateOfDeath);
-      
-      if (deathDate < birthDate) {
-        newErrors.dateOfDeath = 'Death date must be after birth date';
-      }
-    }
-
-    if (data.basicInfo?.biography && data.basicInfo.biography.length > 2000) {
-      newErrors.biography = 'Biography must be less than 2000 characters';
-    }
-
-    if (data.lifeStory?.content && data.lifeStory.content.length > 10000) {
-      newErrors.lifeStory = 'Life story must be less than 10000 characters';
-    }
-
-    return newErrors;
-  };
-
   // Update form data with validation
-  const updateFormData = (updates: Partial<MemorialProfileFormData>) => {
+  const updateFormData = (updates: Partial<MemorialProfileFormData>): void => {
+    const updateKeys = Object.keys(updates);
+    const firstKey = updateKeys[0];
+    const value = firstKey ? (updates as any)[firstKey] : undefined;
+    console.log('[MemorialProfileForm] Updating form data:', {
+      updateField: firstKey,
+      updateValue: value,
+      currentName: formData.name,
+      currentDateOfBirth: formData.basicInfo?.dateOfBirth
+    });
     const newData = { ...formData, ...updates };
-    const newErrors = validateForm(newData);
-    setErrors(newErrors);
     setFormData(newData);
     setHasUnsavedChanges(true);
-    debouncedSave(newData);
+  };
+
+  // Validate form data
+  const validateForm = (data: MemorialProfileFormData): boolean => {
+    console.log('[MemorialProfileForm] Validating form data:', {
+      name: data.name,
+      dateOfBirth: data.basicInfo?.dateOfBirth,
+      hasErrors: Object.keys(errors).length > 0
+    });
+    const newErrors: FormErrors = {};
+
+    // Only validate required fields when saving/publishing
+    if (!data.name?.trim()) {
+      newErrors.name = 'Name is required';
+    }
+    if (!data.basicInfo?.dateOfBirth) {
+      newErrors.dateOfBirth = 'Date of birth is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      console.log('[MemorialProfileForm] Validation errors:', newErrors);
+      setErrors(newErrors);
+      return false;
+    }
+
+    return true;
   };
 
   // Calculate completion percentage with validation
   useEffect(() => {
+    console.log('[MemorialProfileForm] Calculating completion percentage:', {
+      name: formData.name,
+      description: formData.description,
+      hasImage: !!formData.imageUrl,
+      hasDateOfBirth: !!formData.basicInfo?.dateOfBirth,
+      hasDateOfDeath: !!formData.basicInfo?.dateOfDeath,
+      hasBiography: !!formData.basicInfo?.biography,
+      hasLifeStory: !!formData.lifeStory?.content
+    });
+
     const requiredFields = [
       formData.name,
       formData.description,
@@ -176,18 +199,41 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
     setCompletionPercentage(percentage);
   }, [formData, errors]);
 
+  const formatDate = (date: Date | Timestamp | null | undefined): string => {
+    if (!date) return '';
+    
+    try {
+      if (date instanceof Date) {
+        return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
+      }
+      if (date instanceof Timestamp) {
+        const dateObj = date.toDate();
+        return isNaN(dateObj.getTime()) ? '' : dateObj.toISOString().split('T')[0];
+      }
+      return '';
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return '';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validationErrors = validateForm(formData);
-    
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      toast.error('Please fix the errors before publishing');
-      return;
-    }
-
+    console.log('[MemorialProfileForm] Form submission started', {
+      name: formData.name,
+      dateOfBirth: formData.basicInfo?.dateOfBirth,
+      completionPercentage,
+      hasErrors: Object.keys(errors).length > 0
+    });
     setLoading(true);
     try {
+      if (!validateForm(formData)) {
+        console.log('[MemorialProfileForm] Form validation failed');
+        toast.error('Required Fields Missing: Please fill in the required fields (Name and Date of Birth) before saving.');
+        setLoading(false);
+        return;
+      }
+      console.log('[MemorialProfileForm] Form validation passed, proceeding with submission');
       const metadata = {
         tags: formData.metadata?.tags || [],
         categories: formData.metadata?.categories || [],
@@ -195,16 +241,16 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
         lastModifiedAt: Timestamp.fromDate(new Date()),
         version: (formData.metadata?.version || 0) + 1
       };
-
       await onSubmit({
         ...formData,
         status: 'published',
         metadata
       });
+      console.log('[MemorialProfileForm] Form submitted successfully');
       toast.success(profile ? 'Memorial updated successfully' : 'Memorial created successfully');
       setHasUnsavedChanges(false);
     } catch (error) {
-      console.error('Error saving memorial:', error);
+      console.error('[MemorialProfileForm] Error saving memorial:', error);
       toast.error('Failed to save memorial');
     } finally {
       setLoading(false);
@@ -212,6 +258,11 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
   };
 
   const handleSaveDraft = async () => {
+    console.log('[MemorialProfileForm] Saving draft', {
+      name: formData.name,
+      dateOfBirth: formData.basicInfo?.dateOfBirth,
+      completionPercentage
+    });
     setLoading(true);
     try {
       const metadata = {
@@ -221,15 +272,16 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
         lastModifiedAt: Timestamp.fromDate(new Date()),
         version: (formData.metadata?.version || 0) + 1
       };
-
       await onSubmit({
         ...formData,
         status: 'draft',
         metadata
       });
+      console.log('[MemorialProfileForm] Draft saved successfully');
       toast.success('Draft saved successfully');
+      setHasUnsavedChanges(false);
     } catch (error) {
-      console.error('Error saving draft:', error);
+      console.error('[MemorialProfileForm] Error saving draft:', error);
       toast.error('Failed to save draft');
     } finally {
       setLoading(false);
@@ -277,8 +329,52 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
   };
 
   const handleCancel = () => {
-    onCancel();
+    console.log('[MemorialProfileForm] Canceling form', {
+      hasUnsavedChanges,
+      name: formData.name,
+      dateOfBirth: formData.basicInfo?.dateOfBirth
+    });
+    if (hasUnsavedChanges) {
+      if (window.confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+        onCancel();
+      }
+    } else {
+      onCancel();
+    }
   };
+
+  const handleTimelineUpdate = async (updatedEvents: LifeEvent[]) => {
+    console.log('[MemorialProfileForm] Timeline update:', {
+      eventCount: updatedEvents.length,
+      firstEvent: updatedEvents[0]?.title,
+      lastEvent: updatedEvents[updatedEvents.length - 1]?.title
+    });
+    try {
+      const updatedData = {
+        ...formData,
+        timeline: updatedEvents.map(event => ({
+          ...event,
+          createdAt: event.createdAt || new Date(),
+          updatedAt: new Date()
+        })),
+        updatedAt: Timestamp.now()
+      };
+      console.log('[MemorialProfileForm] Saving timeline data');
+      await onSubmit(updatedData);
+      console.log('[MemorialProfileForm] Timeline saved successfully');
+      toast.success('Timeline updated successfully');
+    } catch (error) {
+      console.error('[MemorialProfileForm] Error updating timeline:', error);
+      toast.error('Failed to update timeline');
+    }
+  };
+
+  useEffect(() => {
+    console.log('[MemorialProfileForm] Timeline data updated:', {
+      timelineLength: formData.timeline.length,
+      profileTimelineLength: profile?.timeline?.length || 0
+    });
+  }, [formData.timeline, profile?.timeline]);
 
   return (
     <motion.div
@@ -349,7 +445,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
               <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
                 <div className="sm:col-span-4">
                   <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                    Full Name
+                    Full Name <span className="text-red-500">*</span>
                   </label>
                   <Input
                     id="name"
@@ -386,26 +482,23 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
               <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
                 <div className="sm:col-span-3">
                   <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700">
-                    Date of Birth
+                    Date of Birth <span className="text-red-500">*</span>
                   </label>
                   <Input
                     id="dateOfBirth"
                     type="date"
-                    value={
-                      formData.basicInfo?.dateOfBirth
-                        ? (formData.basicInfo.dateOfBirth instanceof Date
-                            ? formData.basicInfo.dateOfBirth.toISOString().split('T')[0]
-                            : formData.basicInfo.dateOfBirth instanceof Timestamp
-                              ? formData.basicInfo.dateOfBirth.toDate().toISOString().split('T')[0]
-                              : '')
-                        : ''
-                    }
-                    onChange={(e) => updateFormData({
-                      basicInfo: {
-                        ...formData.basicInfo!,
-                        dateOfBirth: new Date(e.target.value)
+                    value={formatDate(formData.basicInfo?.dateOfBirth)}
+                    onChange={(e) => {
+                      const date = e.target.value ? new Date(e.target.value) : null;
+                      if (date && !isNaN(date.getTime())) {
+                        updateFormData({
+                          basicInfo: {
+                            ...formData.basicInfo!,
+                            dateOfBirth: date
+                          }
+                        });
                       }
-                    })}
+                    }}
                     className={`mt-1 ${errors.dateOfBirth ? 'border-red-500' : ''}`}
                   />
                   {errors.dateOfBirth && (
@@ -420,21 +513,18 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
                   <Input
                     id="dateOfDeath"
                     type="date"
-                    value={
-                      formData.basicInfo?.dateOfDeath
-                        ? (formData.basicInfo.dateOfDeath instanceof Date
-                            ? formData.basicInfo.dateOfDeath.toISOString().split('T')[0]
-                            : formData.basicInfo.dateOfDeath instanceof Timestamp
-                              ? formData.basicInfo.dateOfDeath.toDate().toISOString().split('T')[0]
-                              : '')
-                        : ''
-                    }
-                    onChange={(e) => updateFormData({
-                      basicInfo: {
-                        ...formData.basicInfo!,
-                        dateOfDeath: new Date(e.target.value)
+                    value={formatDate(formData.basicInfo?.dateOfDeath)}
+                    onChange={(e) => {
+                      const date = e.target.value ? new Date(e.target.value) : null;
+                      if (date && !isNaN(date.getTime())) {
+                        updateFormData({
+                          basicInfo: {
+                            ...formData.basicInfo!,
+                            dateOfDeath: date
+                          }
+                        });
                       }
-                    })}
+                    }}
                     className={`mt-1 ${errors.dateOfDeath ? 'border-red-500' : ''}`}
                   />
                   {errors.dateOfDeath && (
@@ -497,52 +587,21 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
 
           <TabsContent value="life" className="space-y-6">
             <Card className="p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Biography & Life Story</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Life Story</h3>
               <div className="space-y-6">
-                <div>
-                  <label htmlFor="biography" className="block text-sm font-medium text-gray-700">
-                    Biography
-                  </label>
-                  <RichTextEditor
-                    value={formData.basicInfo?.biography}
-                    onChange={(value) => updateFormData({
-                      basicInfo: {
-                        ...formData.basicInfo!,
-                        biography: value
-                      }
-                    })}
-                    placeholder="Write a detailed biography..."
-                  />
-                  {errors.biography && (
-                    <p className="mt-1 text-sm text-red-600">{errors.biography}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Life Story
-                  </label>
-                  <LifeStoryEditor
-                    value={formData.lifeStory?.content || ''}
-                    onChange={(content) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        lifeStory: {
-                          ...prev.lifeStory,
-                          content,
-                          updatedAt: new Date(),
-                        },
-                      }));
-                    }}
-                    onImageUpload={async (file) => {
-                      // TODO: Implement image upload
-                      return URL.createObjectURL(file);
-                    }}
-                  />
-                  {errors.lifeStory && (
-                    <p className="mt-1 text-sm text-red-600">{errors.lifeStory}</p>
-                  )}
-                </div>
+                <LifeStoryEditor
+                  value={formData.lifeStory?.content || ''}
+                  onChange={(content) => updateFormData({
+                    lifeStory: {
+                      ...formData.lifeStory,
+                      content,
+                      updatedAt: new Date(),
+                    },
+                  })}
+                />
+                {errors.lifeStory && (
+                  <p className="mt-1 text-sm text-red-600">{errors.lifeStory}</p>
+                )}
               </div>
             </Card>
           </TabsContent>
@@ -551,12 +610,13 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
             <Card className="p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Life Timeline</h3>
               <div className="mt-4">
-                <SimpleTimelineBuilder
-                  existingEvents={formData.timelineEvents}
-                  onUpdate={async (events) => {
-                    setFormData((prev) => ({ ...prev, timelineEvents: events }));
-                  }}
-                  isSubmitting={loading}
+                <TimelineBuilder
+                  initialEvents={formData.timeline}
+                  onEventsChange={handleTimelineUpdate}
+                  orgId={profile?.universityId || ''}
+                  profileId={formData.id || ''}
+                  isEditMode={true}
+                  isPreview={false}
                 />
               </div>
             </Card>

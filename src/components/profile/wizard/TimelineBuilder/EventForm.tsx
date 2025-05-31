@@ -1,5 +1,5 @@
 import React from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, SubmitHandler, FieldValues } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
@@ -7,11 +7,12 @@ import { Card } from '@/components/ui/Card';
 import { LifeEvent } from '@/types/profile';
 
 const eventSchema = z.object({
-  type: z.enum(['education', 'work']),
+  type: z.enum(['education', 'work', 'other']),
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
   startDate: z.string().min(1, 'Start date is required'),
   endDate: z.string().optional(),
+  location: z.string().optional()
 }).refine((data) => {
   if (data.endDate) {
     return new Date(data.endDate) > new Date(data.startDate);
@@ -47,12 +48,18 @@ export const EventForm: React.FC<EventFormProps> = ({
       description: initialData?.description || '',
       startDate: initialData?.startDate || '',
       endDate: initialData?.endDate || '',
+      location: initialData?.location || ''
     },
   });
 
+  const onSubmitHandler: SubmitHandler<FieldValues> = (data) => {
+    const eventData = data as Omit<LifeEvent, 'id'>;
+    onSubmit(eventData);
+  };
+
   return (
     <Card variant="bordered">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmitHandler)} className="space-y-4">
         <div>
           <label htmlFor="type" className="block text-sm font-medium text-gray-700">
             Type
@@ -64,6 +71,7 @@ export const EventForm: React.FC<EventFormProps> = ({
           >
             <option value="education">Education</option>
             <option value="work">Work</option>
+            <option value="other">Other</option>
           </select>
         </div>
 

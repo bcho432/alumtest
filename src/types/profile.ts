@@ -6,14 +6,20 @@ export type EventType = 'education' | 'work';
 
 export interface LifeEvent {
   id: string;
-  type: EventType;
+  type: 'education' | 'work' | 'other';
   title: string;
   startDate: string;
   endDate?: string;
-  description?: string;
   location?: string;
-  createdAt?: Date;
-  updatedAt?: Date;
+  description?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  metadata?: {
+    institution?: string;
+    degree?: string;
+    company?: string;
+    position?: string;
+  };
 }
 
 export interface TimelineBuilderProps {
@@ -184,6 +190,7 @@ export interface MemorialProfile extends BaseProfile {
     content: string;
     updatedAt: Timestamp;
   };
+  timeline: TimelineEvent[];
 }
 
 export type Profile = PersonalProfile | MemorialProfile;
@@ -227,8 +234,8 @@ export interface LocalDraft {
   description?: string;
   imageUrl?: string;
   basicInfo?: {
-    dateOfBirth: Date;
-    dateOfDeath: Date;
+    dateOfBirth: Date | null;
+    dateOfDeath: Date | null;
     biography: string;
     photo: string;
     birthLocation: string;
@@ -645,7 +652,7 @@ export interface ProfileFormData {
   };
 }
 
-export interface MemorialProfileFormData extends Omit<MemorialProfile, 'basicInfo' | 'lifeStory'> {
+export interface MemorialProfileFormData extends Omit<MemorialProfile, 'basicInfo' | 'lifeStory' | 'timeline'> {
   basicInfo: {
     dateOfBirth: Date | Timestamp | null;
     dateOfDeath: Date | Timestamp | null;
@@ -658,6 +665,6 @@ export interface MemorialProfileFormData extends Omit<MemorialProfile, 'basicInf
     content: string;
     updatedAt: Date | Timestamp;
   };
-  timelineEvents?: TimelineEvent[];
+  timeline: LifeEvent[];
   mediaUrls?: string[];
 } 

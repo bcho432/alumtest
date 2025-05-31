@@ -21,6 +21,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { validateProfile } from '@/types/profile';
 import { debounce } from 'lodash';
+import { BasicInfoTab } from './tabs/BasicInfoTab';
+import { BiographyTab } from './tabs/BiographyTab';
+import { LifeStoryTab } from './tabs/LifeStoryTab';
 
 // Dynamically import the rich text editor to avoid SSR issues
 const RichTextEditor = dynamic(() => import('@/components/ui/RichTextEditor').then(mod => mod.RichTextEditor), {
@@ -144,7 +147,7 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
       deathLocation: '',
     },
     lifeStory: {
-      content: '',
+      content: '{}',
       updatedAt: new Date(),
     },
     status: 'draft',
@@ -212,7 +215,21 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
       const profileDoc = await getDoc(profileRef);
       
       if (profileDoc.exists()) {
-        setFormData(profileDoc.data() as ProfileFormData);
+        const data = profileDoc.data() as ProfileFormData;
+        // Ensure lifeStory.content is a valid JSON string
+        if (data.lifeStory?.content) {
+          try {
+            JSON.parse(data.lifeStory.content);
+          } catch {
+            data.lifeStory.content = '{}';
+          }
+        } else {
+          data.lifeStory = {
+            content: '{}',
+            updatedAt: new Date()
+          };
+        }
+        setFormData(data);
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -233,6 +250,18 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
           ...value,
           dateOfBirth: value.dateOfBirth instanceof Date ? value.dateOfBirth : null,
           dateOfDeath: value.dateOfDeath instanceof Date ? value.dateOfDeath : null
+        };
+      } else if (field === 'lifeStory') {
+        // Ensure content is a valid JSON string
+        let content = value.content;
+        if (typeof content === 'object') {
+          content = JSON.stringify(content);
+        }
+        newData.lifeStory = {
+          ...prev.lifeStory,
+          ...value,
+          content,
+          updatedAt: new Date()
         };
       } else {
         (newData as any)[field] = value;
@@ -410,9 +439,7 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
         },
         lifeStory: {
           ...formData.lifeStory,
-          updatedAt: formData.lifeStory.updatedAt instanceof Timestamp 
-            ? formData.lifeStory.updatedAt 
-            : Timestamp.fromDate(formData.lifeStory.updatedAt)
+          updatedAt: Timestamp.now()
         },
         metadata: {
           ...formData.metadata,
@@ -425,6 +452,10 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
       if (profileId) {
         const profileRef = doc(db, `universities/${universityId}/profiles/${profileId}`);
         await updateDoc(profileRef, profileData);
+        toast({
+          title: 'Success',
+          description: 'Profile updated successfully',
+        });
       } else {
         const newProfileRef = doc(collection(db, `universities/${universityId}/profiles`));
         await setDoc(newProfileRef, {
@@ -433,19 +464,18 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
           createdAt: Timestamp.now(),
           createdBy: user?.uid || 'system'
         });
+        toast({
+          title: 'Success',
+          description: 'Profile created successfully',
+        });
       }
 
       // Clear saved form data after successful submission
       localStorage.removeItem(`profile-form-${universityId}-${profileId || 'new'}`);
 
-      toast({
-        title: 'Success',
-        description: `Profile ${status === 'published' ? 'published' : 'saved as draft'} successfully`
-      });
-
-      // Only call onSuccess if we're not in the initial creation flow
-      if (profileId) {
-        onSuccess?.();
+      // Only redirect if onSuccess is provided
+      if (onSuccess) {
+        onSuccess();
       }
     } catch (error) {
       console.error('Error saving profile:', error);
@@ -476,194 +506,57 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
           transition={{ duration: 0.2 }}
         >
           {activeTab === 'basic' && (
-            <Card className="p-6">
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Name</label>
-                  <Input
-                    value={formData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    placeholder="Enter name"
-                    className="mt-1"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Type</label>
-                  <Select
-                    value={formData.type}
-                    onChange={(value) => handleInputChange('type', value)}
-                    options={[
-                      { value: 'memorial', label: 'Memorial' },
-                      { value: 'personal', label: 'Personal' }
-                    ]}
-                    className="mt-1"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
-                  <Input
-                    type="date"
-                    value={formData.basicInfo.dateOfBirth instanceof Date 
-                      ? formData.basicInfo.dateOfBirth.toISOString().split('T')[0]
-                      : formData.basicInfo.dateOfBirth instanceof Timestamp
-                        ? formData.basicInfo.dateOfBirth.toDate().toISOString().split('T')[0]
-                        : ''}
-                    onChange={(e) => {
-                      const newDate = e.target.value ? new Date(e.target.value) : undefined;
-                      handleDateChange('dateOfBirth', newDate);
-                    }}
-                    max={new Date().toISOString().split('T')[0]}
-                    className={`mt-1 ${fieldErrors.dateOfBirth ? 'border-red-500' : ''}`}
-                  />
-                  {fieldErrors.dateOfBirth && (
-                    <p className="mt-1 text-sm text-red-600">{fieldErrors.dateOfBirth}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Date of Death</label>
-                  <Input
-                    type="date"
-                    value={formData.basicInfo.dateOfDeath instanceof Date 
-                      ? formData.basicInfo.dateOfDeath.toISOString().split('T')[0]
-                      : formData.basicInfo.dateOfDeath instanceof Timestamp
-                        ? formData.basicInfo.dateOfDeath.toDate().toISOString().split('T')[0]
-                        : ''}
-                    onChange={(e) => {
-                      const newDate = e.target.value ? new Date(e.target.value) : undefined;
-                      handleDateChange('dateOfDeath', newDate);
-                    }}
-                    min={formData.basicInfo.dateOfBirth 
-                      ? (formData.basicInfo.dateOfBirth instanceof Date 
-                        ? formData.basicInfo.dateOfBirth.toISOString().split('T')[0]
-                        : formData.basicInfo.dateOfBirth instanceof Timestamp
-                          ? formData.basicInfo.dateOfBirth.toDate().toISOString().split('T')[0]
-                          : undefined)
-                      : undefined}
-                    max={new Date().toISOString().split('T')[0]}
-                    className={`mt-1 ${fieldErrors.dateOfDeath ? 'border-red-500' : ''}`}
-                  />
-                  {fieldErrors.dateOfDeath && (
-                    <p className="mt-1 text-sm text-red-600">{fieldErrors.dateOfDeath}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Birth Location</label>
-                  <Input
-                    value={formData.basicInfo.birthLocation}
-                    onChange={(e) => handleInputChange('basicInfo', {
-                      ...formData.basicInfo,
-                      birthLocation: e.target.value
-                    })}
-                    placeholder="Enter birth location"
-                    className="mt-1"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Death Location</label>
-                  <Input
-                    value={formData.basicInfo.deathLocation}
-                    onChange={(e) => handleInputChange('basicInfo', {
-                      ...formData.basicInfo,
-                      deathLocation: e.target.value
-                    })}
-                    placeholder="Enter death location"
-                    className="mt-1"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Profile Photo</label>
-                  <div className="mt-1 flex items-center space-x-4">
-                    {formData.basicInfo.photo && (
-                      <img
-                        src={formData.basicInfo.photo}
-                        alt="Profile"
-                        className="h-20 w-20 rounded-full object-cover"
-                      />
-                    )}
-                    <Button
-                      variant="outline"
-                      onClick={() => document.getElementById('photo-upload')?.click()}
-                      disabled={uploading}
-                    >
-                      {uploading ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                      ) : (
-                        <Icon name="upload" className="h-4 w-4 mr-2" />
-                      )}
-                      Upload Photo
-                    </Button>
-                    <input
-                      id="photo-upload"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
-                    />
-                  </div>
-                </div>
-              </div>
-            </Card>
+            <BasicInfoTab
+              formData={formData}
+              onInputChange={handleInputChange}
+              onDateChange={handleDateChange}
+              onFileUpload={handleFileUpload}
+              fieldErrors={fieldErrors}
+              uploading={uploading}
+            />
           )}
 
           {activeTab === 'biography' && (
-            <Card className="p-6">
-              <div className="space-y-4">
-                <label className="block text-sm font-medium text-gray-700">Biography</label>
-                <RichTextEditor
-                  value={formData.basicInfo.biography}
-                  onChange={(value: string) => handleInputChange('basicInfo', {
-                    ...formData.basicInfo,
-                    biography: value
-                  })}
-                  placeholder="Write a detailed biography..."
-                />
-              </div>
-            </Card>
+            <BiographyTab
+              formData={formData}
+              onInputChange={handleInputChange}
+            />
           )}
 
           {activeTab === 'lifeStory' && (
-            <Card className="p-6">
-              <div className="space-y-4">
-                <label className="block text-sm font-medium text-gray-700">Life Story</label>
-                <RichTextEditor
-                  value={formData.lifeStory.content}
-                  onChange={(value: string) => handleInputChange('lifeStory', {
-                    ...formData.lifeStory,
-                    content: value,
-                    updatedAt: new Date()
-                  })}
-                  placeholder="Write a detailed life story..."
-                />
-              </div>
-            </Card>
+            <LifeStoryTab
+              formData={formData}
+              onInputChange={handleInputChange}
+            />
           )}
         </motion.div>
       </AnimatePresence>
 
-      <div className="flex justify-end space-x-3">
+      <div className="flex justify-end gap-4 pt-6 border-t">
+        <Button
+          variant="outline"
+          onClick={() => {
+            if (window.history.length > 1) {
+              window.history.back();
+            } else {
+              window.location.href = `/admin/universities/${universityId}/profiles`;
+            }
+          }}
+        >
+          Cancel
+        </Button>
         <Button
           variant="outline"
           onClick={() => handleSubmit('draft')}
           disabled={loading}
         >
-          Save as Draft
+          {loading ? 'Saving...' : 'Save Draft'}
         </Button>
         <Button
           onClick={() => handleSubmit('published')}
           disabled={loading}
         >
-          {loading ? (
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-          ) : (
-            <Icon name="check" className="h-4 w-4 mr-2" />
-          )}
-          Publish
+          {loading ? 'Publishing...' : 'Publish'}
         </Button>
       </div>
 
@@ -675,7 +568,7 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
               Are you sure you want to publish this profile? Once published, it will be visible to all users.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end space-x-3 mt-4">
+          <div className="flex justify-end gap-4 mt-4">
             <Button
               variant="outline"
               onClick={() => setShowPublishDialog(false)}

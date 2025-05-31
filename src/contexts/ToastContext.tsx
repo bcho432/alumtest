@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useLayoutEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast, ToastOptions } from 'react-hot-toast';
 
@@ -15,7 +15,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Initialize the context after the component mounts
-  React.useEffect(() => {
+  useLayoutEffect(() => {
     setIsInitialized(true);
   }, []);
 

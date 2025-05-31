@@ -44,8 +44,8 @@ export function useTimeline({
   const fetchEvents = useCallback(async (lastDocument?: DocumentData) => {
     try {
       const { db } = await getFirebaseServices();
-      const collectionPath = `universities/${orgId}/profiles/${profileId}/events`;
-      const eventsRef = collection(db, collectionPath);
+      const collectionPath = 'profiles';
+      const eventsRef = collection(db, collectionPath, profileId, 'timeline');
       
       let q = query(
         eventsRef,

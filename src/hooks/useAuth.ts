@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useLayoutEffect } from 'react';
 import { 
   getAuth,
   onAuthStateChanged,
@@ -36,7 +36,7 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
   const auth = getAuth();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {

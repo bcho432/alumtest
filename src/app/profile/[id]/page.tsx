@@ -16,6 +16,7 @@ import { EditorRequestButton } from '@/components/common/EditorRequestButton';
 import type { University } from '@/types/university';
 import { toast } from 'react-hot-toast';
 import { Timestamp } from 'firebase/firestore';
+import { TimelineView } from '@/components/timeline/TimelineView';
 
 interface Memorial {
   id: string;
@@ -344,7 +345,22 @@ export default function ProfilePage() {
                     </div>
                     <div>
                       <h2 className="text-lg font-medium text-gray-900">Life Story</h2>
-                      <p className="mt-2 text-gray-600">{(profile as MemorialProfile).lifeStory.content}</p>
+                      <div className="mt-2 text-gray-600">
+                        {(() => {
+                          try {
+                            const lifeStoryContent = JSON.parse((profile as MemorialProfile).lifeStory.content) as Record<string, string>;
+                            return Object.entries(lifeStoryContent).map(([question, answer]) => (
+                              <div key={question} className="mb-4">
+                                <h3 className="font-medium text-gray-900">{question}</h3>
+                                <p className="mt-1">{answer}</p>
+                              </div>
+                            ));
+                          } catch (error) {
+                            console.error('Error parsing life story content:', error);
+                            return <p>{(profile as MemorialProfile).lifeStory.content}</p>;
+                          }
+                        })()}
+                      </div>
                     </div>
                     <div>
                       <h2 className="text-lg font-medium text-gray-900">Basic Information</h2>
@@ -379,6 +395,21 @@ export default function ProfilePage() {
                 )}
               </div>
             </div>
+
+            {/* Timeline Section */}
+            {!isPersonalProfile && (profile as MemorialProfile).timeline && (profile as MemorialProfile).timeline.length > 0 && (
+              <div className="bg-white shadow rounded-lg p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Timeline</h2>
+                <TimelineView
+                  orgId={profile.id}
+                  profileId={profile.id}
+                  onEventClick={(event) => {
+                    // Handle event click if needed
+                    console.log('Event clicked:', event);
+                  }}
+                />
+              </div>
+            )}
           </div>
           {/* Right Column (optional: university info, etc.) */}
           <div className="space-y-8">

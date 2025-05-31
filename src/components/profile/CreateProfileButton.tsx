@@ -1,12 +1,12 @@
 import React, { useCallback } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/hooks/useAuth';
 import { useCreateProfile } from '@/hooks/useCreateProfile';
 import { toast } from 'react-hot-toast';
 import { Timestamp } from 'firebase/firestore';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, setDoc, writeBatch } from 'firebase/firestore';
 import { getFirebaseServices } from '@/lib/firebase';
 
 interface CreateProfileButtonProps {
@@ -76,8 +76,8 @@ export const CreateProfileButton: React.FC<CreateProfileButtonProps> = ({
         description: '',
         imageUrl: '',
         basicInfo: {
-          dateOfBirth: undefined,
-          dateOfDeath: undefined,
+          dateOfBirth: null,
+          dateOfDeath: null,
           biography: '',
           photo: '',
           birthLocation: '',
@@ -106,6 +106,63 @@ export const CreateProfileButton: React.FC<CreateProfileButtonProps> = ({
       
       console.log('[CreateProfileButton] Checking profile in collection:', collectionPath);
       
+      // Initialize the timeline subcollection
+      const { db } = await getFirebaseServices();
+      if (!db) {
+        throw new Error('Database not initialized');
+      }
+
+      const batch = writeBatch(db);
+      
+      // Create the main profile document
+      const profileRef = doc(db, collectionPath, profileId);
+      batch.set(profileRef, {
+        id: profileId,
+        universityId,
+        type: profileType,
+        status: 'draft',
+        createdBy: user.uid,
+        updatedBy: user.uid,
+        name: '',
+        description: '',
+        imageUrl: '',
+        basicInfo: {
+          dateOfBirth: null,
+          dateOfDeath: null,
+          biography: '',
+          photo: '',
+          birthLocation: '',
+          deathLocation: ''
+        },
+        lifeStory: {
+          content: '',
+          updatedAt: Timestamp.now()
+        },
+        isPublic: false,
+        metadata: {
+          tags: [],
+          categories: [],
+          lastModifiedBy: user.uid,
+          lastModifiedAt: Timestamp.now(),
+          version: 1
+        }
+      });
+
+      // Initialize the timeline subcollection
+      const timelineRef = collection(db, collectionPath, profileId, 'timeline');
+      const initialTimelineDoc = doc(timelineRef);
+      batch.set(initialTimelineDoc, {
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+        type: 'initialization',
+        title: 'Profile Created',
+        description: 'Profile timeline initialized',
+        startDate: Timestamp.now().toDate().toISOString(),
+      });
+
+      // Commit the batch
+      await batch.commit();
+      
       // Poll for the profile to be saved
       const profileExists = await pollForProfile(profileId, collectionPath);
       
@@ -116,8 +173,8 @@ export const CreateProfileButton: React.FC<CreateProfileButtonProps> = ({
         
         console.log('[CreateProfileButton] Redirecting to:', targetPath);
         
-        // Use replace instead of push to prevent back button issues
-        await router.replace(targetPath);
+        // Use window.location for navigation
+        window.location.href = targetPath;
       } else {
         console.log('[CreateProfileButton] Profile not found after all attempts');
         toast.error('Profile creation is taking longer than expected. Please try refreshing the page.');

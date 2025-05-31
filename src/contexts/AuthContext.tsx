@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useLayoutEffect, ReactNode } from 'react';
 import { 
   User as FirebaseUser,
   signInWithEmailAndPassword,
@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const { isStoriatsAdmin, loading: storiatsAdminsLoading, error: storiatsAdminsError } = useStoriatsAdmins();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     console.log('[Auth Context] Setting up auth state listener');
     
     const initAuth = async () => {

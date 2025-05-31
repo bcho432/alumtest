@@ -91,6 +91,16 @@ export default function UniversityManagementClient() {
     }
   }, [universityId, toast]);
 
+  const handleNavigation = (path: string) => {
+    try {
+      if (typeof window !== 'undefined') {
+        window.location.href = path;
+      }
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
+  };
+
   if (!universityId) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -134,13 +144,13 @@ export default function UniversityManagementClient() {
             <div className="flex space-x-3">
               <Button
                 variant="outline"
-                onClick={() => {/* TODO: Implement export */}}
+                onClick={() => handleNavigation(`/admin/universities/${universityId}/export`)}
               >
                 <Icon name="download" className="w-4 h-4 mr-2" />
                 Export Data
               </Button>
               <Button
-                onClick={() => {/* TODO: Implement settings */}}
+                onClick={() => handleNavigation(`/admin/universities/${universityId}/settings`)}
               >
                 <Icon name="cog" className="w-4 h-4 mr-2" />
                 Settings

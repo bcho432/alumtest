@@ -43,6 +43,11 @@ export default function EditMemorialPage() {
     fetchMemorial();
   }, [org, id, router]);
 
+  const lifeEventToTimelineEvent = (event: any) => ({
+    ...event,
+    type: event.type === 'work' ? 'job' : event.type === 'other' ? 'event' : event.type,
+  });
+
   const handleSubmit = async (data: MemorialProfileFormData) => {
     try {
       const { db } = await getFirebaseServices();
@@ -50,9 +55,10 @@ export default function EditMemorialPage() {
 
       const memorialRef = doc(db, `universities/${org}/profiles`, id as string);
       
-      // Convert dates to Timestamps
+      // Convert dates to Timestamps and LifeEvent[] to TimelineEvent[]
       const profileData: Partial<MemorialProfile> = {
         ...data,
+        timeline: data.timeline.map(lifeEventToTimelineEvent),
         basicInfo: {
           ...data.basicInfo,
           dateOfBirth: data.basicInfo.dateOfBirth 

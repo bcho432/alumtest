@@ -20,15 +20,20 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRouterReady, setIsRouterReady] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
+    setIsRouterReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (isRouterReady && !loading && !user) {
       router.push('/auth/login');
     }
     if (user) {
       setDisplayName(user.displayName || '');
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, isRouterReady]);
 
   const handleUpdateProfile = async () => {
     if (!user) return;

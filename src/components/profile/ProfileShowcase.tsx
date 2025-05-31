@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Icon } from '@/components/ui/Icon';
 import { Badge } from '@/components/ui/Badge';
-import { Profile, MemorialProfile, PersonalProfile, TimelineEvent } from '@/types/profile';
+import { Profile, MemorialProfile, PersonalProfile, TimelineEvent, LifeEvent } from '@/types/profile';
 import { Timestamp } from 'firebase/firestore';
 import { TimelineView } from '@/components/timeline/TimelineView';
 
@@ -38,6 +38,11 @@ const hasDescription = (profile: Profile): profile is MemorialProfile => {
 const hasTimelineEvents = (profile: Profile): profile is MemorialProfile & { timelineEvents: TimelineEvent[] } => {
   return isMemorialProfile(profile) && 'timelineEvents' in profile && Array.isArray(profile.timelineEvents);
 };
+
+const timelineEventToLifeEvent = (event: any) => ({
+  ...event,
+  type: event.type === 'job' ? 'work' : event.type === 'event' ? 'other' : event.type,
+});
 
 export const ProfileShowcase: React.FC<ProfileShowcaseProps> = ({ profile }) => {
   const getPhotoUrl = (profile: Profile): string | undefined => {
@@ -135,10 +140,11 @@ export const ProfileShowcase: React.FC<ProfileShowcaseProps> = ({ profile }) => 
           <TimelineView
             orgId={profile.universityId}
             profileId={profile.id}
-            onEventClick={(event: TimelineEvent) => {
+            onEventClick={(event: LifeEvent) => {
               // Handle event click if needed
               console.log('Event clicked:', event);
             }}
+            events={profile.timeline.map(timelineEventToLifeEvent)}
           />
         </motion.div>
       )}

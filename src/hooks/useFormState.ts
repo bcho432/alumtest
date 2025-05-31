@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useLayoutEffect, useCallback } from 'react';
 import { useToast } from './useToast';
 
 interface UseFormStateOptions<T> {
@@ -26,7 +26,7 @@ export function useFormState<T extends Record<string, any>>({
   const { showToast } = useToast();
 
   // Auto-save effect
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isDirty || !storageKey) return;
 
     const timeoutId = setTimeout(async () => {

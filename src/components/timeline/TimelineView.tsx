@@ -1,260 +1,108 @@
-import { useRef, useCallback } from 'react';
-import { useInView } from 'react-intersection-observer';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useTimeline } from '@/hooks/useTimeline';
-import { TimelineEvent } from '@/types/profile';
-import { formatDate } from '@/utils/date';
+import React from 'react';
+import { format } from 'date-fns';
+import { Card } from '../ui/Card';
+import { Icon } from '../ui/Icon';
+import { LifeEvent } from '@/types/profile';
 
 interface TimelineViewProps {
-  orgId: string;
-  profileId: string;
-  onEventClick?: (event: TimelineEvent) => void;
+  orgId?: string;
+  profileId?: string;
+  events?: LifeEvent[];
+  onEventClick?: (event: LifeEvent) => void;
 }
 
-export function TimelineView({ orgId, profileId, onEventClick }: TimelineViewProps) {
-  const { ref: loadMoreRef, inView } = useInView({
-    threshold: 0,
-    rootMargin: '100px',
-  });
-
-  const {
-    events,
-    isLoading,
-    error,
-    hasMore,
-    loadMore,
-    refresh,
-    isRefreshing,
-  } = useTimeline({
-    orgId,
-    profileId,
-  });
-
-  // Load more when the user scrolls to the bottom
-  const handleLoadMore = useCallback(() => {
-    if (inView && hasMore && !isLoading) {
-      loadMore();
-    }
-  }, [inView, hasMore, isLoading, loadMore]);
-
+export function TimelineView({ orgId, profileId, events, onEventClick }: TimelineViewProps) {
   // Group events by year
-  const eventsByYear = events.reduce((acc, event) => {
-    const year = new Date(event.startDate).getFullYear();
-    if (!acc[year]) {
-      acc[year] = [];
-    }
-    acc[year].push(event);
-    return acc;
-  }, {} as Record<number, TimelineEvent[]>);
+  const groupedEvents = React.useMemo(() => {
+    if (!events) return {};
+    
+    return events.reduce((acc, event) => {
+      const year = new Date(event.startDate).getFullYear();
+      if (!acc[year]) {
+        acc[year] = [];
+      }
+      acc[year].push(event);
+      return acc;
+    }, {} as Record<number, LifeEvent[]>);
+  }, [events]);
 
-  const years = Object.keys(eventsByYear).sort((a, b) => Number(b) - Number(a));
+  // Sort years in descending order
+  const sortedYears = React.useMemo(() => {
+    return Object.keys(groupedEvents)
+      .map(Number)
+      .sort((a, b) => b - a);
+  }, [groupedEvents]);
 
-  if (error) {
+  if (!events || events.length === 0) {
     return (
-      <div className="error-container">
-        <div className="error-icon">⚠️</div>
-        <h3 className="error-title">Error loading timeline</h3>
-        <p className="error-message">{error.message}</p>
-        <button
-          className="retry-button"
-          onClick={refresh}
-          disabled={isRefreshing}
-        >
-          {isRefreshing ? 'Retrying...' : 'Try Again'}
-        </button>
+      <div className="text-center py-8 text-gray-500">
+        No events to display
       </div>
     );
   }
 
   return (
-    <div className="timeline-container">
-      <AnimatePresence>
-        {years.map((year) => (
-          <motion.div
-            key={year}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-          >
-            <div className="year-section">
-              <h2 className="year-header">{year}</h2>
-              <div className="events-list">
-                {eventsByYear[Number(year)].map((event) => (
-                  <motion.div
-                    key={event.id}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <div
-                      className="event-card"
-                      onClick={() => onEventClick?.(event)}
-                    >
-                      <h3 className="event-title">{event.title}</h3>
-                      <p className="event-date">
-                        {formatDate(event.startDate)}
-                        {event.endDate && ` - ${formatDate(event.endDate)}`}
-                      </p>
-                      {event.description && (
-                        <p className="event-description">{event.description}</p>
-                      )}
-                      {event.location && (
-                        <p className="event-location">📍 {event.location}</p>
-                      )}
+    <div className="space-y-8">
+      {sortedYears.map((year) => (
+        <div key={year} className="space-y-4">
+          <h3 className="text-xl font-semibold text-gray-900">{year}</h3>
+          <div className="space-y-4">
+            {groupedEvents[year].map((event) => (
+              <Card
+                key={event.id}
+                className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => onEventClick?.(event)}
+              >
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0">
+                    <Icon
+                      name={
+                        event.type === 'education'
+                          ? 'graduation-cap'
+                          : event.type === 'work'
+                          ? 'briefcase'
+                          : 'calendar'
+                      }
+                      className="text-gray-500"
+                    />
+                  </div>
+                  <div className="flex-grow">
+                    <h4 className="text-lg font-semibold">{event.title}</h4>
+                    <div className="mt-1 text-sm text-gray-500">
+                      {format(new Date(event.startDate), 'MMM yyyy')}
+                      {event.endDate && ` - ${format(new Date(event.endDate), 'MMM yyyy')}`}
                     </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </AnimatePresence>
-
-      {/* Loading indicator */}
-      <div ref={loadMoreRef} className="loading-container">
-        {isLoading && <div className="spinner" />}
-        {!hasMore && events.length > 0 && (
-          <p className="no-more-events">No more events to load</p>
-        )}
-        {!isLoading && events.length === 0 && (
-          <p className="no-events">No events found</p>
-        )}
-      </div>
-
-      <style jsx>{`
-        .timeline-container {
-          display: flex;
-          flex-direction: column;
-          gap: 2rem;
-          width: 100%;
-        }
-
-        .year-section {
-          margin-bottom: 2rem;
-        }
-
-        .year-header {
-          font-size: 1.5rem;
-          font-weight: bold;
-          color: #2d3748;
-          margin-bottom: 1rem;
-          position: sticky;
-          top: 0;
-          background: white;
-          padding: 0.5rem 0;
-          z-index: 1;
-        }
-
-        .events-list {
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        .event-card {
-          padding: 1rem;
-          background: white;
-          border-radius: 0.375rem;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-          border: 1px solid #e2e8f0;
-          cursor: ${onEventClick ? 'pointer' : 'default'};
-        }
-
-        .event-title {
-          font-size: 1.125rem;
-          font-weight: 600;
-          color: #1a202c;
-        }
-
-        .event-date {
-          font-size: 0.875rem;
-          color: #4a5568;
-        }
-
-        .event-description {
-          margin-top: 0.5rem;
-          color: #2d3748;
-        }
-
-        .event-location {
-          margin-top: 0.25rem;
-          font-size: 0.875rem;
-          color: #4a5568;
-        }
-
-        .loading-container {
-          padding: 1rem;
-          text-align: center;
-        }
-
-        .spinner {
-          width: 2rem;
-          height: 2rem;
-          border: 3px solid #e2e8f0;
-          border-top-color: #4299e1;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-          margin: 0 auto;
-        }
-
-        .no-more-events,
-        .no-events {
-          color: #718096;
-        }
-
-        .error-container {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          text-align: center;
-          height: 200px;
-          padding: 1rem;
-        }
-
-        .error-icon {
-          font-size: 2.5rem;
-          margin-bottom: 1rem;
-        }
-
-        .error-title {
-          font-size: 1.25rem;
-          font-weight: 600;
-          color: #e53e3e;
-          margin-bottom: 0.5rem;
-        }
-
-        .error-message {
-          color: #4a5568;
-          margin-bottom: 1rem;
-        }
-
-        .retry-button {
-          padding: 0.5rem 1rem;
-          background-color: #4299e1;
-          color: white;
-          border: none;
-          border-radius: 0.375rem;
-          cursor: pointer;
-          font-weight: 500;
-          transition: background-color 0.2s;
-        }
-
-        .retry-button:hover {
-          background-color: #3182ce;
-        }
-
-        .retry-button:disabled {
-          background-color: #a0aec0;
-          cursor: not-allowed;
-        }
-
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
+                    {event.location && (
+                      <div className="mt-1 text-sm text-gray-500">
+                        📍 {event.location}
+                      </div>
+                    )}
+                    {event.description && (
+                      <p className="mt-2 text-sm text-gray-600">{event.description}</p>
+                    )}
+                    {event.metadata && (
+                      <div className="mt-2 text-sm text-gray-500">
+                        {event.metadata.institution && (
+                          <div>🏫 {event.metadata.institution}</div>
+                        )}
+                        {event.metadata.degree && (
+                          <div>🎓 {event.metadata.degree}</div>
+                        )}
+                        {event.metadata.company && (
+                          <div>🏢 {event.metadata.company}</div>
+                        )}
+                        {event.metadata.position && (
+                          <div>👔 {event.metadata.position}</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 } 

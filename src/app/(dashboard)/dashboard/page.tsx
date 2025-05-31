@@ -30,6 +30,16 @@ const DashboardContent = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const handleNavigation = (path: string) => {
+    try {
+      if (typeof window !== 'undefined') {
+        window.location.href = path;
+      }
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
+  };
+
   useEffect(() => {
     console.log('Dashboard mounted, user:', user?.uid);
     if (user) {
@@ -156,7 +166,7 @@ const DashboardContent = () => {
                 <p className="mt-1 text-gray-600">Manage your university profiles and settings</p>
               </div>
               <Button
-                onClick={() => router.push('/admin/universities/new')}
+                onClick={() => handleNavigation('/admin/universities/new')}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
               >
                 <Icon name="plus" className="w-4 h-4 mr-2" />
@@ -175,7 +185,7 @@ const DashboardContent = () => {
                 You are not an admin of any universities yet. Add a university to get started.
               </p>
               <Button
-                onClick={() => router.push('/admin/universities/new')}
+                onClick={() => handleNavigation('/admin/universities/new')}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
               >
                 <Icon name="plus" className="w-4 h-4 mr-2" />
@@ -220,14 +230,14 @@ const DashboardContent = () => {
                   <div className="space-y-3">
                     <Button 
                       variant="outline" 
-                      onClick={() => router.push(`/university/${university.id}`)}
+                      onClick={() => handleNavigation(`/university/${university.id}`)}
                       className="w-full group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-200 transition-colors"
                     >
                       <Icon name="eye" className="w-4 h-4 mr-2" />
                       View Public Page
                     </Button>
                     <Button 
-                      onClick={() => router.push(`/admin/universities/${university.id}`)}
+                      onClick={() => handleNavigation(`/admin/universities/${university.id}`)}
                       className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
                     >
                       <Icon name="settings" className="w-4 h-4 mr-2" />

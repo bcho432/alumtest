@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, writeBatch, getDocs, DocumentData } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
 import { useAnalytics } from './useAnalytics';
 import { useToast } from './useToast';
@@ -33,8 +33,28 @@ export const useTimelineAutoSave = ({
     setIsSaving(true);
     try {
       const dbInstance = await getDb();
-      const timelineRef = doc(dbInstance, 'organizations', orgId, 'profiles', profileId);
-      await setDoc(timelineRef, { events }, { merge: true });
+      const timelineRef = collection(dbInstance, 'profiles', profileId, 'timeline');
+      
+      // Use a batch write to ensure atomic updates
+      const batch = writeBatch(dbInstance);
+      
+      // Delete existing events
+      const existingEvents = await getDocs(timelineRef);
+      existingEvents.docs.forEach((doc: DocumentData) => {
+        batch.delete(doc.ref);
+      });
+      
+      // Add new events
+      events.forEach(event => {
+        const newEventRef = doc(timelineRef);
+        batch.set(newEventRef, {
+          ...event,
+          createdAt: event.createdAt || new Date(),
+          updatedAt: new Date()
+        });
+      });
+      
+      await batch.commit();
 
       trackEvent('timeline_autosave_success', {
         eventCount: events.length,
@@ -65,7 +85,6 @@ export const useTimelineAutoSave = ({
           title: 'Error',
           description: 'Failed to save changes. Please try again.',
           status: 'error',
-          // position: 'bottom-left', // Not supported by ToastOptions
         });
       }
     } finally {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useLayoutEffect } from 'react';
 import { Profile } from '@/types/profile';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/useToast';
@@ -13,7 +13,7 @@ export const useProfile = (profileId?: string) => {
   const { user } = useAuth();
   const { showToast } = useToast();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const fetchProfile = async () => {
       if (!user?.userData?.id && !profileId) {
         setProfile(null);

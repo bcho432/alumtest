@@ -27,11 +27,9 @@ export const useTimelineEvents = ({ orgId, profileId }: UseTimelineEventsProps) 
       const dbInstance = await getDb();
       const eventsRef = collection(
         dbInstance,
-        'universities',
-        orgId,
         'profiles',
         profileId,
-        'timelineEvents'
+        'timeline'
       );
 
       const q = query(
