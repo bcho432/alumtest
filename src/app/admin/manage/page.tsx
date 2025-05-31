@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/use-toast';
+import { Spinner } from '@/components/ui/Spinner';
 
 export default function AdminManagementPage() {
   const [email, setEmail] = useState('');
@@ -20,9 +21,26 @@ export default function AdminManagementPage() {
       toast('You must be logged in to add admins', 'error');
       return;
     }
-    await addAdmin(email, name, user.email);
-    setEmail('');
-    setName('');
+    try {
+      await addAdmin(email, name, user.email);
+      setEmail('');
+      setName('');
+    } catch (error) {
+      console.error('Error adding admin:', error);
+    }
+  };
+
+  const handleRemoveAdmin = async (email: string) => {
+    if (!user?.email) {
+      toast('You must be logged in to remove admins', 'error');
+      return;
+    }
+    try {
+      await removeAdmin(email, user.email);
+    } catch (error) {
+      console.error('Error removing admin:', error);
+      toast('Failed to remove admin', 'error');
+    }
   };
 
   return (
@@ -57,7 +75,9 @@ export default function AdminManagementPage() {
       <Card className="p-6">
         <h2 className="text-xl font-semibold mb-4">Current Admins</h2>
         {loading ? (
-          <div>Loading admins...</div>
+          <div className="flex justify-center p-4">
+            <Spinner className="w-6 h-6" />
+          </div>
         ) : (
           <div className="space-y-4">
             {admins.map((admin) => (
@@ -68,7 +88,7 @@ export default function AdminManagementPage() {
                 </div>
                 <Button
                   variant="outline"
-                  onClick={() => removeAdmin(admin.id)}
+                  onClick={() => handleRemoveAdmin(admin.email)}
                 >
                   Remove
                 </Button>
