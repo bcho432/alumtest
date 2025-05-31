@@ -13,6 +13,7 @@ import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
 import { validateEmail } from '@/lib/validation';
 import { useRouter } from 'next/navigation';
+import { Switch } from '@/components/ui/Switch';
 
 export default function StoriatsAdminSettingsPage() {
   const { user, isAdmin, loading: authLoading } = useAuth();
@@ -22,7 +23,9 @@ export default function StoriatsAdminSettingsPage() {
     loading: storiatsAdminsLoading,
     addAdmin,
     removeAdmin,
+    toggleEmailRecipient,
     isStoriatsAdmin,
+    isEmailRecipient,
     refreshSettings,
     error: storiatsAdminsError
   } = useStoriatsAdmins();
@@ -130,6 +133,16 @@ export default function StoriatsAdminSettingsPage() {
     }
   };
 
+  const handleToggleEmailRecipient = async (email: string) => {
+    if (!user?.email) return;
+
+    try {
+      await toggleEmailRecipient(email.toLowerCase(), user.email.toLowerCase());
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to update email recipient status');
+    }
+  };
+
   if (isCheckingAccess || authLoading || storiatsAdminsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
@@ -181,7 +194,7 @@ export default function StoriatsAdminSettingsPage() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h1 className="text-2xl font-semibold text-gray-900">Storiats Admin Settings</h1>
-                <p className="mt-1 text-gray-600">Manage Storiats admin access</p>
+                <p className="mt-1 text-gray-600">Manage Storiats admin access and email notifications</p>
               </div>
               <Button
                 onClick={() => refreshSettings()}
@@ -198,97 +211,89 @@ export default function StoriatsAdminSettingsPage() {
             </div>
 
             <div className="space-y-6">
-              <div>
-                <h2 className="text-lg font-medium text-gray-900 mb-4">Add New Admin</h2>
-                <div className="flex gap-4">
-                  <Input
-                    type="email"
-                    value={newAdminEmail}
-                    onChange={(e) => setNewAdminEmail(e.target.value)}
-                    placeholder="Enter admin email"
-                    className="flex-1"
-                    disabled={isAdding}
-                  />
-                  <Button
-                    onClick={handleAddAdmin}
-                    disabled={isAdding || !newAdminEmail}
-                  >
-                    {isAdding ? (
+              <div className="flex gap-4">
+                <Input
+                  type="email"
+                  value={newAdminEmail}
+                  onChange={(e) => setNewAdminEmail(e.target.value)}
+                  placeholder="Enter admin email"
+                  className="flex-1"
+                />
+                <Button
+                  onClick={handleAddAdmin}
+                  disabled={isAdding || !newAdminEmail}
+                  className="whitespace-nowrap"
+                >
+                  {isAdding ? (
+                    <>
                       <Spinner className="w-4 h-4 mr-2" />
-                    ) : (
-                      <Icon name="plus" className="w-4 h-4 mr-2" />
-                    )}
-                    Add Admin
-                  </Button>
-                </div>
+                      Adding...
+                    </>
+                  ) : (
+                    'Add Admin'
+                  )}
+                </Button>
               </div>
 
-              <div>
-                <h2 className="text-lg font-medium text-gray-900 mb-4">Current Admins</h2>
-                <div className="space-y-3">
-                  {settings?.adminEmails.length === 0 ? (
-                    <p className="text-gray-500 italic">No admins found</p>
-                  ) : (
-                    settings?.adminEmails.map((email: string) => (
-                      <div
-                        key={email}
-                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
-                      >
-                        <div>
-                          <p className="font-medium text-gray-900">{email}</p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            Last updated: {settings.lastUpdated.toLocaleString()}
-                          </p>
-                        </div>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => setShowRemoveConfirm(email)}
-                          disabled={isRemoving === email || settings.adminEmails.length <= 1}
-                        >
-                          {isRemoving === email ? (
-                            <Spinner className="w-4 h-4" />
-                          ) : (
-                            'Remove'
-                          )}
-                        </Button>
+              <div className="space-y-4">
+                <h2 className="text-lg font-medium text-gray-900">Current Admins</h2>
+                <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
+                  {settings?.adminEmails.map((email) => (
+                    <div key={email} className="p-4 flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">{email}</p>
+                        <p className="text-sm text-gray-500">Added by {settings.updatedBy}</p>
                       </div>
-                    ))
-                  )}
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={isEmailRecipient(email)}
+                            onChange={() => handleToggleEmailRecipient(email)}
+                            className="data-[state=checked]:bg-indigo-600"
+                          />
+                          <span className="text-sm text-gray-600">Email Recipient</span>
+                        </div>
+                        {showRemoveConfirm === email ? (
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleRemoveAdmin(email)}
+                              disabled={isRemoving === email}
+                            >
+                              {isRemoving === email ? (
+                                <Spinner className="w-4 h-4" />
+                              ) : (
+                                'Confirm'
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setShowRemoveConfirm(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setShowRemoveConfirm(email)}
+                            disabled={isRemoving === email}
+                          >
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
           </Card>
         </div>
       </div>
-
-      {showRemoveConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <Card className="max-w-md w-full p-6">
-            <div className="text-center">
-              <Icon name="exclamation-triangle" className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Remove Admin</h2>
-              <p className="text-gray-600 mb-4">
-                Are you sure you want to remove {showRemoveConfirm} from the admin list?
-              </p>
-              <div className="flex justify-center gap-4">
-                <Button
-                  variant="secondary"
-                  onClick={() => setShowRemoveConfirm(null)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={() => handleRemoveAdmin(showRemoveConfirm)}
-                >
-                  Remove
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
     </ErrorBoundary>
   );
 } 

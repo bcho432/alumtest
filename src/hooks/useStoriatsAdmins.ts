@@ -9,16 +9,19 @@ interface StoriatsAdmin {
   name: string;
   addedBy: string;
   addedAt: Date;
+  isEmailRecipient: boolean;
 }
 
 interface AdminSettings {
   adminEmails: string[];
+  emailRecipients: string[];
   lastUpdated: Date;
   updatedBy: string;
 }
 
 interface FirestoreAdminSettings {
   adminEmails: string[];
+  emailRecipients: string[];
   lastUpdated: Timestamp;
   updatedBy: string;
 }
@@ -76,6 +79,7 @@ export const useStoriatsAdmins = () => {
         const settings: AdminSettings = {
           ...data,
           adminEmails: data.adminEmails.map(e => e.toLowerCase()),
+          emailRecipients: data.emailRecipients?.map(e => e.toLowerCase()) || [],
           lastUpdated: data.lastUpdated.toDate()
         };
         
@@ -85,6 +89,7 @@ export const useStoriatsAdmins = () => {
         
         console.log(`[Fetch ${fetchId}] Successfully fetched settings:`, {
           adminCount: settings.adminEmails.length,
+          recipientCount: settings.emailRecipients.length,
           lastUpdated: settings.lastUpdated,
           updatedBy: settings.updatedBy
         });
@@ -98,6 +103,7 @@ export const useStoriatsAdmins = () => {
         // Initialize with default settings if document doesn't exist
         const defaultSettings: AdminSettings = {
           adminEmails: [],
+          emailRecipients: [],
           lastUpdated: new Date(),
           updatedBy: 'system'
         };
@@ -134,8 +140,7 @@ export const useStoriatsAdmins = () => {
 
   const addAdmin = async (email: string, name: string, addedBy: string) => {
     try {
-      setLoading(true); // Set loading state before operation
-      // Ensure settings are loaded
+      setLoading(true);
       if (!settings) {
         console.log('Settings not loaded, fetching...');
         await fetchSettings(true);
@@ -146,7 +151,6 @@ export const useStoriatsAdmins = () => {
 
       const emailLower = email.toLowerCase();
       
-      // Check if admin already exists
       if (settings?.adminEmails.includes(emailLower)) {
         toast('This email is already a Storiats admin', 'error');
         return;
@@ -157,15 +161,15 @@ export const useStoriatsAdmins = () => {
       
       await setDoc(settingsRef, {
         adminEmails: newEmails,
+        emailRecipients: settings?.emailRecipients || [],
         lastUpdated: Timestamp.now(),
         updatedBy: addedBy
       });
 
-      // Invalidate cache
       cachedSettings = null;
       lastFetchTime = 0;
       
-      await fetchSettings(true); // Force refresh
+      await fetchSettings(true);
       toast('Storiats admin added successfully', 'success');
     } catch (error) {
       console.error('Error adding Storiats admin:', error);
@@ -178,8 +182,7 @@ export const useStoriatsAdmins = () => {
 
   const removeAdmin = async (email: string, updatedBy: string) => {
     try {
-      setLoading(true); // Set loading state before operation
-      // Ensure settings are loaded
+      setLoading(true);
       if (!settings) {
         console.log('Settings not loaded, fetching...');
         await fetchSettings(true);
@@ -194,7 +197,6 @@ export const useStoriatsAdmins = () => {
         return;
       }
 
-      // Prevent removing the last admin
       if (settings.adminEmails.length <= 1) {
         toast('Cannot remove the last admin', 'error');
         return;
@@ -202,18 +204,19 @@ export const useStoriatsAdmins = () => {
 
       const settingsRef = doc(db, 'adminSettings', 'storiatsAdmins');
       const newEmails = settings.adminEmails.filter(e => e !== emailLower);
+      const newRecipients = settings.emailRecipients.filter(e => e !== emailLower);
       
       await setDoc(settingsRef, {
         adminEmails: newEmails,
+        emailRecipients: newRecipients,
         lastUpdated: Timestamp.now(),
         updatedBy
       });
 
-      // Invalidate cache
       cachedSettings = null;
       lastFetchTime = 0;
       
-      await fetchSettings(true); // Force refresh
+      await fetchSettings(true);
       toast('Storiats admin removed successfully', 'success');
     } catch (error) {
       console.error('Error removing Storiats admin:', error);
@@ -224,53 +227,72 @@ export const useStoriatsAdmins = () => {
     }
   };
 
-  const isStoriatsAdmin = useCallback((email: string) => {
-    if (!email || !settings) {
-      console.log('[isStoriatsAdmin] No email or settings loaded.');
-      return false;
+  const toggleEmailRecipient = async (email: string, updatedBy: string) => {
+    try {
+      setLoading(true);
+      if (!settings) {
+        console.log('Settings not loaded, fetching...');
+        await fetchSettings(true);
+      }
+
+      const { db } = await getFirebaseServices();
+      if (!db) throw new Error('Firestore instance not available');
+
+      const emailLower = email.toLowerCase();
+      if (!settings?.adminEmails.includes(emailLower)) {
+        toast('Email not in admin list', 'error');
+        return;
+      }
+
+      const settingsRef = doc(db, 'adminSettings', 'storiatsAdmins');
+      const isCurrentlyRecipient = settings.emailRecipients.includes(emailLower);
+      const newRecipients = isCurrentlyRecipient
+        ? settings.emailRecipients.filter(e => e !== emailLower)
+        : [...settings.emailRecipients, emailLower];
+      
+      await setDoc(settingsRef, {
+        adminEmails: settings.adminEmails,
+        emailRecipients: newRecipients,
+        lastUpdated: Timestamp.now(),
+        updatedBy
+      });
+
+      cachedSettings = null;
+      lastFetchTime = 0;
+      
+      await fetchSettings(true);
+      toast(
+        isCurrentlyRecipient
+          ? 'Admin removed from email recipients'
+          : 'Admin added to email recipients',
+        'success'
+      );
+    } catch (error) {
+      console.error('Error updating email recipient status:', error);
+      toast('Failed to update email recipient status', 'error');
+      throw error;
+    } finally {
+      setLoading(false);
     }
-    const emailLower = email.toLowerCase();
-    const found = settings.adminEmails.map(e => e.toLowerCase()).includes(emailLower);
-    console.log(`[isStoriatsAdmin] Checking admin for: ${emailLower}, found: ${found}`);
-    return found;
+  };
+
+  const isStoriatsAdmin = useCallback((email: string) => {
+    return settings?.adminEmails.includes(email.toLowerCase()) || false;
   }, [settings]);
 
-  // Initial fetch
-  useEffect(() => {
-    console.log('Initial fetch of admin settings');
-    const initializeSettings = async () => {
-      try {
-        await fetchSettings(true); // Force fetch on initialization
-      } catch (error) {
-        console.error('Failed to fetch initial admin settings:', error);
-        // Initialize with empty settings if fetch fails
-        setSettings({
-          adminEmails: [],
-          lastUpdated: new Date(),
-          updatedBy: 'system'
-        });
-      }
-    };
-    initializeSettings();
-  }, [fetchSettings]);
-
-  // Transform settings into the expected format for the admin management page
-  const admins = settings?.adminEmails.map(email => ({
-    id: email,
-    email,
-    name: email.split('@')[0], // Use part before @ as name
-    addedBy: settings.updatedBy,
-    addedAt: settings.lastUpdated
-  })) || [];
+  const isEmailRecipient = useCallback((email: string) => {
+    return settings?.emailRecipients.includes(email.toLowerCase()) || false;
+  }, [settings]);
 
   return {
     settings,
-    admins,
     loading,
     error,
     addAdmin,
     removeAdmin,
+    toggleEmailRecipient,
     isStoriatsAdmin,
+    isEmailRecipient,
     refreshSettings: () => fetchSettings(true)
   };
 }; 

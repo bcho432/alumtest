@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/Card';
@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getFirebaseServices } from '@/lib/firebase';
 import { usePublishedContent } from '@/hooks/usePublishedContent';
+import { useStoriatsAdmins } from '@/hooks/useStoriatsAdmins';
 
 interface FormData {
   name: string;
@@ -26,6 +27,7 @@ export default function Contact() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { data: faqs = [], isLoading: isLoadingFaqs } = usePublishedContent('faq');
+  const { settings: adminSettings } = useStoriatsAdmins();
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
@@ -63,6 +65,15 @@ export default function Contact() {
 
       await addDoc(collection(db, 'support_tickets'), ticketData);
 
+      // Get email recipients from admin settings
+      const recipients = adminSettings?.emailRecipients || [];
+      
+      if (recipients.length === 0) {
+        console.warn('No email recipients configured in admin settings');
+        toast('Message sent successfully, but no email recipients are configured.', 'info');
+        return;
+      }
+
       // Send email notification
       const response = await fetch('/api/send-email', {
         method: 'POST',
@@ -70,7 +81,7 @@ export default function Contact() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          to: ['matthew.bo@storiats.com', 'derek.lee@storiats.com', 'justin.lontoh@storiats.com'],
+          to: recipients,
           subject: `New Contact Form Submission: ${formData.subject}`,
           text: `
             Name: ${formData.name}

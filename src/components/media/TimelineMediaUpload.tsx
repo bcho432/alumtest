@@ -22,7 +22,7 @@ export const TimelineMediaUpload: React.FC<TimelineMediaUploadProps> = ({
 
   const handleFileChange = async (files: File[]) => {
     if (!user) {
-      showToast({ title: 'Please sign in to upload media', status: 'error' });
+      showToast('Please sign in to upload media', 'error');
       return;
     }
 
@@ -50,15 +50,15 @@ export const TimelineMediaUpload: React.FC<TimelineMediaUploadProps> = ({
       if (results.success.length > 0) {
         const newMediaUrls = [...existingMedia, ...results.success];
         onMediaChange(newMediaUrls);
-        showToast({ title: 'Media uploaded successfully', status: 'success' });
+        showToast('Media uploaded successfully', 'success');
       }
 
       if (results.failed.length > 0) {
-        showToast({ title: `${results.failed.length} file(s) failed to upload`, status: 'error' });
+        showToast(`${results.failed.length} file(s) failed to upload`, 'error');
       }
     } catch (error) {
       console.error('Error uploading media:', error);
-      showToast({ title: 'Failed to upload media', status: 'error' });
+      showToast('Failed to upload media', 'error');
     } finally {
       setIsUploading(false);
       setUploadProgress([]);

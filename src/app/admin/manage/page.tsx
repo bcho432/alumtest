@@ -12,7 +12,7 @@ import { Spinner } from '@/components/ui/Spinner';
 export default function AdminManagementPage() {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
-  const { admins, loading, addAdmin, removeAdmin } = useStoriatsAdmins();
+  const { settings, loading, addAdmin, removeAdmin } = useStoriatsAdmins();
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -80,21 +80,21 @@ export default function AdminManagementPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {admins.map((admin) => (
-              <div key={admin.id} className="flex items-center justify-between p-4 border rounded">
+            {settings?.adminEmails.map((adminEmail) => (
+              <div key={adminEmail} className="flex items-center justify-between p-4 border rounded">
                 <div>
-                  <div className="font-medium">{admin.name}</div>
-                  <div className="text-sm text-gray-500">{admin.email}</div>
+                  <div className="font-medium">{adminEmail.split('@')[0]}</div>
+                  <div className="text-sm text-gray-500">{adminEmail}</div>
                 </div>
                 <Button
                   variant="outline"
-                  onClick={() => handleRemoveAdmin(admin.email)}
+                  onClick={() => handleRemoveAdmin(adminEmail)}
                 >
                   Remove
                 </Button>
               </div>
             ))}
-            {admins.length === 0 && (
+            {(!settings?.adminEmails || settings.adminEmails.length === 0) && (
               <div className="text-gray-500">No admins found</div>
             )}
           </div>
