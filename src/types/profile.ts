@@ -172,8 +172,8 @@ export interface MemorialProfile extends BaseProfile {
   description: string;
   imageUrl: string;
   basicInfo: {
-    dateOfBirth: Date | Timestamp;
-    dateOfDeath: Date | Timestamp;
+    dateOfBirth: Timestamp | null;
+    dateOfDeath: Timestamp | null;
     biography: string;
     photo: string;
     birthLocation: string;
@@ -181,7 +181,7 @@ export interface MemorialProfile extends BaseProfile {
   };
   lifeStory: {
     content: string;
-    updatedAt: Date | Timestamp;
+    updatedAt: Timestamp;
   };
 }
 
@@ -492,12 +492,17 @@ export const validateProfile = (profile: Partial<Profile>): string[] => {
       errors.push('Description is required for memorial profiles');
     }
 
-    if (!memorial.basicInfo?.dateOfBirth) {
-      errors.push('Date of birth is required for memorial profiles');
-    }
+    if (memorial.basicInfo?.dateOfBirth && memorial.basicInfo?.dateOfDeath) {
+      const birthDate = memorial.basicInfo.dateOfBirth instanceof Timestamp 
+        ? memorial.basicInfo.dateOfBirth.toDate() 
+        : memorial.basicInfo.dateOfBirth;
+      const deathDate = memorial.basicInfo.dateOfDeath instanceof Timestamp 
+        ? memorial.basicInfo.dateOfDeath.toDate() 
+        : memorial.basicInfo.dateOfDeath;
 
-    if (!memorial.basicInfo?.dateOfDeath) {
-      errors.push('Date of death is required for memorial profiles');
+      if (birthDate > deathDate) {
+        errors.push('Date of birth must be before date of death');
+      }
     }
 
     if (!memorial.basicInfo?.biography?.trim()) {
@@ -609,4 +614,47 @@ export interface PendingChange {
   status: 'pending' | 'approved' | 'rejected';
   submittedBy: string;
   submittedAt: string;
+}
+
+export interface ProfileFormData {
+  name: string;
+  type: 'personal' | 'memorial';
+  description: string;
+  imageUrl: string;
+  basicInfo: {
+    dateOfBirth: Date | null;
+    dateOfDeath: Date | null;
+    biography: string;
+    photo: string;
+    birthLocation: string;
+    deathLocation: string;
+  };
+  lifeStory: {
+    content: string;
+    updatedAt: Date;
+  };
+  status: 'draft' | 'published';
+  isPublic: boolean;
+  metadata: {
+    tags: string[];
+    categories: string[];
+    lastModifiedBy: string;
+    lastModifiedAt: Timestamp;
+    version: number;
+  };
+}
+
+export interface MemorialProfileFormData extends Omit<MemorialProfile, 'basicInfo' | 'lifeStory'> {
+  basicInfo: {
+    dateOfBirth: Date | Timestamp;
+    dateOfDeath: Date | Timestamp;
+    biography: string;
+    photo: string;
+    birthLocation: string;
+    deathLocation: string;
+  };
+  lifeStory?: {
+    content: string;
+    updatedAt: Date | Timestamp;
+  };
 } 
