@@ -13,6 +13,8 @@ import { Switch } from '@/components/ui/Switch';
 import { Card } from '@/components/ui/Card';
 import { Dialog } from '@/components/ui/Dialog';
 import { MediaGallery } from '@/components/media/MediaGallery';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
+import { TimelineBuilder } from '@/components/timeline/TimelineBuilder';
 import debounce from 'lodash/debounce';
 import { Timestamp } from 'firebase/firestore';
 
@@ -500,17 +502,15 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
                   <label htmlFor="biography" className="block text-sm font-medium text-gray-700">
                     Biography
                   </label>
-                  <Textarea
-                    id="biography"
+                  <RichTextEditor
                     value={formData.basicInfo?.biography}
-                    onChange={(e) => updateFormData({
+                    onChange={(value) => updateFormData({
                       basicInfo: {
                         ...formData.basicInfo!,
-                        biography: e.target.value
+                        biography: value
                       }
                     })}
-                    className={`mt-1 ${errors.biography ? 'border-red-500' : ''}`}
-                    rows={4}
+                    placeholder="Write a detailed biography..."
                   />
                   {errors.biography && (
                     <p className="mt-1 text-sm text-red-600">{errors.biography}</p>
@@ -518,21 +518,18 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
                 </div>
 
                 <div>
-                  <label htmlFor="lifeStory" className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Life Story
                   </label>
-                  <Textarea
-                    id="lifeStory"
-                    value={formData.lifeStory?.content}
-                    onChange={(e) => updateFormData({
+                  <RichTextEditor
+                    value={formData.lifeStory?.content || ''}
+                    onChange={(value) => updateFormData({
                       lifeStory: {
                         ...formData.lifeStory!,
-                        content: e.target.value,
+                        content: value,
                         updatedAt: new Date()
                       }
                     })}
-                    className={`mt-1 ${errors.lifeStory ? 'border-red-500' : ''}`}
-                    rows={8}
                   />
                   {errors.lifeStory && (
                     <p className="mt-1 text-sm text-red-600">{errors.lifeStory}</p>
@@ -546,7 +543,16 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
             <Card className="p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Life Timeline</h3>
               <div className="mt-4">
-                {/* Timeline content removed */}
+                <TimelineBuilder
+                  existingEvents={formData.timelineEvents || []}
+                  onUpdate={async (events) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      timelineEvents: events
+                    }));
+                  }}
+                  isSubmitting={loading}
+                />
               </div>
             </Card>
           </TabsContent>
