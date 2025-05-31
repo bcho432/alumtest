@@ -131,12 +131,24 @@ export const useStoriatsAdmins = () => {
       } else {
         // Wait before retrying
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        // Retry the fetch
+        return fetchSettings(force);
       }
     } finally {
       console.log(`[Fetch ${fetchId}] Fetch completed, resetting inProgress flag`);
       fetchInProgress.current = false;
     }
   }, [toast]);
+
+  // Add useEffect to fetch settings on mount
+  useEffect(() => {
+    console.log('[useStoriatsAdmins] Initializing settings fetch');
+    fetchSettings().catch(error => {
+      console.error('[useStoriatsAdmins] Error during initial fetch:', error);
+      setError(error);
+      setLoading(false);
+    });
+  }, [fetchSettings]);
 
   const addAdmin = async (email: string, name: string, addedBy: string) => {
     try {
