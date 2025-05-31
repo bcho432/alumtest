@@ -139,6 +139,48 @@ export default function AdminDashboard() {
               Manage Settings
             </Button>
           </Card>
+
+          <Card className="p-6 bg-white/80 backdrop-blur-sm border border-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Analytics</h2>
+              <Icon name="chart-bar" className="w-6 h-6 text-indigo-600" />
+            </div>
+            <p className="mb-4 text-gray-600">View platform usage and engagement metrics</p>
+            <Button 
+              onClick={() => handleNavigation('/admin/analytics')}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+            >
+              View Analytics
+            </Button>
+          </Card>
+
+          <Card className="p-6 bg-white/80 backdrop-blur-sm border border-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Support</h2>
+              <Icon name="ticket" className="w-6 h-6 text-indigo-600" />
+            </div>
+            <p className="mb-4 text-gray-600">Manage support tickets and user assistance</p>
+            <Button 
+              onClick={() => handleNavigation('/admin/support')}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+            >
+              Manage Support
+            </Button>
+          </Card>
+
+          <Card className="p-6 bg-white/80 backdrop-blur-sm border border-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Content</h2>
+              <Icon name="document" className="w-6 h-6 text-indigo-600" />
+            </div>
+            <p className="mb-4 text-gray-600">Manage platform content and resources</p>
+            <Button 
+              onClick={() => handleNavigation('/admin/content')}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+            >
+              Manage Content
+            </Button>
+          </Card>
         </div>
       </div>
     </div>
