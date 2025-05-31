@@ -41,11 +41,11 @@ export const CreateProfileButton: React.FC<CreateProfileButtonProps> = ({
       console.log('Profile created successfully:', profileId);
       toast.success(`${profileType === 'memorial' ? 'Memorial' : 'Profile'} created successfully`);
 
-      // Redirect to the appropriate edit page
+      // Redirect to the edit page directly
       if (profileType === 'memorial') {
-        router.push(`/${universityId}/memorials/${profileId}`);
+        router.push(`/${universityId}/memorials/${profileId}/edit`);
       } else {
-        router.push(`/${universityId}/profiles/${profileId}`);
+        router.push(`/${universityId}/profiles/${profileId}/edit`);
       }
     } catch (error) {
       console.error('Error creating profile:', error);

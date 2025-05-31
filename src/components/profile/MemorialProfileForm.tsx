@@ -12,6 +12,7 @@ import { TabsRoot, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Ta
 import { Switch } from '@/components/ui/Switch';
 import { Card } from '@/components/ui/Card';
 import { Dialog } from '@/components/ui/Dialog';
+import { MediaGallery } from '@/components/media/MediaGallery';
 import debounce from 'lodash/debounce';
 import { Timestamp } from 'firebase/firestore';
 
@@ -78,7 +79,6 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
   const [activeTab, setActiveTab] = useState('basic');
   const [completionPercentage, setCompletionPercentage] = useState(0);
   const [errors, setErrors] = useState<FormErrors>({});
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
@@ -274,11 +274,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
   };
 
   const handleCancel = () => {
-    if (hasUnsavedChanges) {
-      setShowCancelDialog(true);
-    } else {
-      onCancel();
-    }
+    onCancel();
   };
 
   return (
@@ -559,7 +555,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
             <Card className="p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Media Gallery</h3>
               <div className="mt-4">
-                {/* Media gallery content removed */}
+                <MediaGallery profileId={formData.id || 'new'} />
               </div>
             </Card>
           </TabsContent>
@@ -618,7 +614,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
           </TabsContent>
         </TabsRoot>
 
-        {/* Footer with unsaved changes warning */}
+        {/* Footer with save buttons */}
         <div className="flex items-center justify-between pt-6 border-t">
           <div className="flex items-center gap-4">
             <Button
@@ -664,36 +660,6 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
           </div>
         </div>
       </form>
-
-      {/* Cancel confirmation dialog */}
-      <Dialog
-        open={showCancelDialog}
-        onOpenChange={setShowCancelDialog}
-      >
-        <div className="p-6">
-          <h2 className="text-lg font-semibold mb-2">Unsaved Changes</h2>
-          <p className="text-gray-600 mb-4">
-            You have unsaved changes. Are you sure you want to cancel?
-          </p>
-          <div className="flex justify-end gap-4">
-            <Button
-              variant="outline"
-              onClick={() => setShowCancelDialog(false)}
-            >
-              Continue Editing
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowCancelDialog(false);
-                onCancel();
-              }}
-            >
-              Discard Changes
-            </Button>
-          </div>
-        </div>
-      </Dialog>
     </motion.div>
   );
 }; 

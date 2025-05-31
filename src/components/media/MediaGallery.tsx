@@ -53,6 +53,23 @@ export function MediaGallery({ profileId, className }: MediaGalleryProps) {
 
   const isAdmin = roles[profileId] === 'admin';
   const isEditor = roles[profileId] === 'editor';
+  const isNewProfile = profileId === 'new';
+
+  // Initialize temporary folder for new profiles
+  useEffect(() => {
+    if (isNewProfile && user) {
+      setFolders([{
+        id: 'temp',
+        name: 'Temporary Uploads',
+        createdBy: user.uid,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        itemCount: 0
+      }]);
+      setCurrentFolder('temp');
+      setIsLoading(false);
+    }
+  }, [isNewProfile, user]);
 
   useEffect(() => {
     if (!profileId) return;
@@ -60,6 +77,10 @@ export function MediaGallery({ profileId, className }: MediaGalleryProps) {
       toast.error('Database not initialized');
       return;
     }
+
+    // Skip Firestore queries for new profiles
+    if (isNewProfile) return;
+
     const dbInstance = db as import('firebase/firestore').Firestore;
     // Listen to folders
     const foldersQuery = query(
@@ -82,7 +103,7 @@ export function MediaGallery({ profileId, className }: MediaGalleryProps) {
     );
 
     return () => unsubscribeFolders();
-  }, [profileId]);
+  }, [profileId, isNewProfile]);
 
   useEffect(() => {
     if (!profileId || !currentFolder) return;
@@ -90,6 +111,10 @@ export function MediaGallery({ profileId, className }: MediaGalleryProps) {
       toast.error('Database not initialized');
       return;
     }
+
+    // Skip Firestore queries for new profiles
+    if (isNewProfile) return;
+
     const dbInstance = db as import('firebase/firestore').Firestore;
     const photosQuery = query(
       collection(dbInstance, 'profiles', profileId, 'mediaFolders', currentFolder, 'photos'),
@@ -117,7 +142,7 @@ export function MediaGallery({ profileId, className }: MediaGalleryProps) {
     );
 
     return () => unsubscribePhotos();
-  }, [profileId, currentFolder]);
+  }, [profileId, currentFolder, isNewProfile]);
 
   const loadMore = async () => {
     if (!profileId || !currentFolder || !lastVisible || !hasMore) return;
@@ -196,11 +221,7 @@ export function MediaGallery({ profileId, className }: MediaGalleryProps) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: async (acceptedFiles) => {
       if (!user || !currentFolder || (!isAdmin && !isEditor)) return;
-      if (!db) {
-        toast.error('Database not initialized');
-        return;
-      }
-      const dbInstance = db as import('firebase/firestore').Firestore;
+      
       setIsUploading(true);
       try {
         const uploadPromises = acceptedFiles.map(file => 
@@ -218,13 +239,32 @@ export function MediaGallery({ profileId, className }: MediaGalleryProps) {
           })
         );
 
-        await Promise.all(uploadPromises);
+        const uploadedFiles = await Promise.all(uploadPromises);
         
-        // Update folder item count
-        await updateDoc(doc(dbInstance, 'profiles', profileId, 'mediaFolders', currentFolder), {
-          itemCount: photos.length + acceptedFiles.length,
-          updatedAt: serverTimestamp()
-        });
+        // For new profiles, just update the local state
+        if (isNewProfile) {
+          const newPhotos = uploadedFiles.map(url => ({
+            id: Math.random().toString(36).substr(2, 9),
+            url,
+            uploadedBy: user.uid,
+            uploadedAt: new Date().toISOString(),
+            tags: [],
+            folderId: currentFolder
+          }));
+          setPhotos(prev => [...prev, ...newPhotos]);
+          setFilteredPhotos(prev => [...prev, ...newPhotos]);
+        } else {
+          // For existing profiles, update Firestore
+          if (!db) {
+            toast.error('Database not initialized');
+            return;
+          }
+          const dbInstance = db as import('firebase/firestore').Firestore;
+          await updateDoc(doc(dbInstance, 'profiles', profileId, 'mediaFolders', currentFolder), {
+            itemCount: photos.length + acceptedFiles.length,
+            updatedAt: serverTimestamp()
+          });
+        }
 
         toast.success('Photos uploaded successfully');
       } catch (error) {

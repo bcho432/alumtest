@@ -164,6 +164,7 @@ export interface PersonalProfile extends BaseProfile {
     date: Timestamp;
     description: string;
   }>;
+  lifeStory?: Record<string, string>;
 }
 
 export interface MemorialProfile extends BaseProfile {

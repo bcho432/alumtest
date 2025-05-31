@@ -443,7 +443,10 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
         description: `Profile ${status === 'published' ? 'published' : 'saved as draft'} successfully`
       });
 
-      onSuccess?.();
+      // Only call onSuccess if we're not in the initial creation flow
+      if (profileId) {
+        onSuccess?.();
+      }
     } catch (error) {
       console.error('Error saving profile:', error);
       toast({
