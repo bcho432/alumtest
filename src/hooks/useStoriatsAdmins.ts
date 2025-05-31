@@ -44,11 +44,11 @@ export const useStoriatsAdmins = () => {
         // Use cache if available and not expired
         const now = Date.now();
         if (!force && cachedSettings && (now - lastFetchTime) < CACHE_DURATION) {
-          console.log('Using cached admin settings');
+          console.log('Using cached admin settings:', cachedSettings);
           setSettings(cachedSettings);
           setLoading(false);
           setError(null);
-          return;
+          return cachedSettings;
         }
 
         const { db } = await getFirebaseServices();
@@ -72,7 +72,10 @@ export const useStoriatsAdmins = () => {
           setSettings(settings);
           setError(null);
           console.log('Fetched admin settings:', settings);
+          setLoading(false);
+          return settings;
         } else {
+          console.log('No admin settings found, initializing with defaults');
           // Initialize with default settings if document doesn't exist
           const defaultSettings: AdminSettings = {
             adminEmails: [],
@@ -87,18 +90,19 @@ export const useStoriatsAdmins = () => {
           cachedSettings = defaultSettings;
           lastFetchTime = now;
           setError(null);
+          setLoading(false);
+          return defaultSettings;
         }
-        
-        setLoading(false);
-        return;
       } catch (error) {
         console.error(`Error fetching admin settings (attempt ${retries + 1}/${MAX_RETRIES}):`, error);
         retries++;
         
         if (retries === MAX_RETRIES) {
-          setError(error instanceof Error ? error : new Error('Failed to fetch admin settings'));
+          const error = new Error('Failed to fetch admin settings');
+          setError(error);
           setLoading(false);
           toast('Failed to fetch admin settings', 'error');
+          throw error;
         } else {
           // Wait before retrying
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
@@ -109,6 +113,12 @@ export const useStoriatsAdmins = () => {
 
   const addAdmin = async (email: string, name: string, addedBy: string) => {
     try {
+      // Ensure settings are loaded
+      if (!settings) {
+        console.log('Settings not loaded, fetching...');
+        await fetchSettings(true);
+      }
+
       const { db } = await getFirebaseServices();
       if (!db) throw new Error('Firestore instance not available');
 
@@ -140,6 +150,12 @@ export const useStoriatsAdmins = () => {
 
   const removeAdmin = async (email: string, updatedBy: string) => {
     try {
+      // Ensure settings are loaded
+      if (!settings) {
+        console.log('Settings not loaded, fetching...');
+        await fetchSettings(true);
+      }
+
       const { db } = await getFirebaseServices();
       if (!db) throw new Error('Firestore instance not available');
 
@@ -173,23 +189,32 @@ export const useStoriatsAdmins = () => {
     }
   };
 
-  const isStoriatsAdmin = useCallback((email: string) => {
+  const isStoriatsAdmin = useCallback(async (email: string) => {
     if (!email) {
       console.log('No email provided for admin check');
       return false;
     }
+
+    // Ensure settings are loaded
+    if (!settings) {
+      console.log('Settings not loaded for admin check, fetching...');
+      await fetchSettings(true);
+    }
+
     const normalizedEmail = email.toLowerCase();
     console.log('Checking admin status for:', normalizedEmail);
     console.log('Available admins:', settings?.adminEmails || []);
     const isAdmin = settings?.adminEmails.includes(normalizedEmail) ?? false;
     console.log('Admin check result:', isAdmin);
     return isAdmin;
-  }, [settings]);
+  }, [settings, fetchSettings]);
 
   // Initial fetch
   useEffect(() => {
     console.log('Initial fetch of admin settings');
-    fetchSettings();
+    fetchSettings().catch(error => {
+      console.error('Failed to fetch initial admin settings:', error);
+    });
   }, [fetchSettings]);
 
   // Transform settings into the expected format for the admin management page
