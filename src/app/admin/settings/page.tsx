@@ -159,7 +159,7 @@ export default function StoriatsAdminSettingsPage() {
                 variant="outline"
                 onClick={() => refreshSettings()}
               >
-                <Icon name="refresh" className="w-4 h-4 mr-2" />
+                <Icon name="reload" className="w-4 h-4 mr-2" />
                 Refresh
               </Button>
             </div>

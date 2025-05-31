@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { getFirebaseServices } from '@/lib/firebase';
 import { useToast } from '@/components/ui/use-toast';
@@ -35,80 +35,88 @@ export const useStoriatsAdmins = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const { toast } = useToast();
+  const fetchInProgress = useRef(false);
 
   const fetchSettings = useCallback(async (force = false) => {
+    // Prevent multiple simultaneous fetches
+    if (fetchInProgress.current) {
+      console.log('Fetch already in progress, skipping...');
+      return cachedSettings;
+    }
+
     let retries = 0;
+    fetchInProgress.current = true;
     
-    while (retries < MAX_RETRIES) {
-      try {
-        // Use cache if available and not expired
-        const now = Date.now();
-        if (!force && cachedSettings && (now - lastFetchTime) < CACHE_DURATION) {
-          console.log('Using cached admin settings:', cachedSettings);
-          setSettings(cachedSettings);
-          setLoading(false);
-          setError(null);
-          return cachedSettings;
-        }
-
-        setLoading(true);
-        const { db } = await getFirebaseServices();
-        if (!db) throw new Error('Firestore instance not available');
-
-        console.log('Fetching admin settings...');
-        const settingsRef = doc(db, 'adminSettings', 'storiatsAdmins');
-        const docSnap = await getDoc(settingsRef);
-        
-        if (docSnap.exists()) {
-          const data = docSnap.data() as FirestoreAdminSettings;
-          const settings: AdminSettings = {
-            ...data,
-            lastUpdated: data.lastUpdated.toDate()
-          };
-          
-          // Update cache
-          cachedSettings = settings;
-          lastFetchTime = now;
-          
-          setSettings(settings);
-          setError(null);
-          console.log('Fetched admin settings:', settings);
-          setLoading(false);
-          return settings;
-        } else {
-          console.log('No admin settings found, initializing with defaults');
-          // Initialize with default settings if document doesn't exist
-          const defaultSettings: AdminSettings = {
-            adminEmails: [],
-            lastUpdated: new Date(),
-            updatedBy: 'system'
-          };
-          await setDoc(settingsRef, {
-            ...defaultSettings,
-            lastUpdated: Timestamp.fromDate(defaultSettings.lastUpdated)
-          });
-          setSettings(defaultSettings);
-          cachedSettings = defaultSettings;
-          lastFetchTime = now;
-          setError(null);
-          setLoading(false);
-          return defaultSettings;
-        }
-      } catch (error) {
-        console.error(`Error fetching admin settings (attempt ${retries + 1}/${MAX_RETRIES}):`, error);
-        retries++;
-        
-        if (retries === MAX_RETRIES) {
-          const error = new Error('Failed to fetch admin settings');
-          setError(error);
-          setLoading(false);
-          toast('Failed to fetch admin settings', 'error');
-          throw error;
-        } else {
-          // Wait before retrying
-          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-        }
+    try {
+      // Use cache if available and not expired
+      const now = Date.now();
+      if (!force && cachedSettings && (now - lastFetchTime) < CACHE_DURATION) {
+        console.log('Using cached admin settings:', cachedSettings);
+        setSettings(cachedSettings);
+        setLoading(false);
+        setError(null);
+        return cachedSettings;
       }
+
+      setLoading(true);
+      const { db } = await getFirebaseServices();
+      if (!db) throw new Error('Firestore instance not available');
+
+      console.log('Fetching admin settings...');
+      const settingsRef = doc(db, 'adminSettings', 'storiatsAdmins');
+      const docSnap = await getDoc(settingsRef);
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data() as FirestoreAdminSettings;
+        const settings: AdminSettings = {
+          ...data,
+          lastUpdated: data.lastUpdated.toDate()
+        };
+        
+        // Update cache
+        cachedSettings = settings;
+        lastFetchTime = now;
+        
+        setSettings(settings);
+        setError(null);
+        console.log('Fetched admin settings:', settings);
+        setLoading(false);
+        return settings;
+      } else {
+        console.log('No admin settings found, initializing with defaults');
+        // Initialize with default settings if document doesn't exist
+        const defaultSettings: AdminSettings = {
+          adminEmails: [],
+          lastUpdated: new Date(),
+          updatedBy: 'system'
+        };
+        await setDoc(settingsRef, {
+          ...defaultSettings,
+          lastUpdated: Timestamp.fromDate(defaultSettings.lastUpdated)
+        });
+        setSettings(defaultSettings);
+        cachedSettings = defaultSettings;
+        lastFetchTime = now;
+        setError(null);
+        setLoading(false);
+        return defaultSettings;
+      }
+    } catch (error) {
+      console.error(`Error fetching admin settings (attempt ${retries + 1}/${MAX_RETRIES}):`, error);
+      retries++;
+      
+      if (retries === MAX_RETRIES) {
+        const error = new Error('Failed to fetch admin settings');
+        setError(error);
+        setLoading(false);
+        toast('Failed to fetch admin settings', 'error');
+        throw error;
+      } else {
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      }
+    } finally {
+      fetchInProgress.current = false;
     }
   }, [toast]);
 
