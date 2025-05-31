@@ -104,12 +104,12 @@ export function useCreateProfile() {
               ? (params.basicInfo.dateOfBirth instanceof Timestamp 
                 ? params.basicInfo.dateOfBirth 
                 : Timestamp.fromDate(new Date(params.basicInfo.dateOfBirth)))
-              : undefined,
+              : null,
             dateOfDeath: params.basicInfo?.dateOfDeath
               ? (params.basicInfo.dateOfDeath instanceof Timestamp
                 ? params.basicInfo.dateOfDeath
                 : Timestamp.fromDate(new Date(params.basicInfo.dateOfDeath)))
-              : undefined,
+              : null,
             biography: params.basicInfo?.biography || '',
             photo: params.basicInfo?.photo || '',
             birthLocation: params.basicInfo?.birthLocation || '',
