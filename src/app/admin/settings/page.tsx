@@ -30,23 +30,27 @@ export default function StoriatsAdminSettingsPage() {
   const [isRemoving, setIsRemoving] = useState<string | null>(null);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState<string | null>(null);
   const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
   useEffect(() => {
     const checkAccess = async () => {
       if (!user?.email) {
         setIsCheckingAccess(false);
+        setIsAdmin(false);
         return;
       }
 
       try {
-        const isAdmin = await isStoriatsAdmin(user.email);
-        console.log('Admin check result:', isAdmin);
-        if (isAdmin) {
+        const adminStatus = await isStoriatsAdmin(user.email);
+        console.log('Admin check result:', adminStatus);
+        setIsAdmin(adminStatus);
+        if (adminStatus) {
           await refreshSettings();
         }
       } catch (error) {
         console.error('Error checking admin access:', error);
         toast('Error checking admin access', 'error');
+        setIsAdmin(false);
       } finally {
         setIsCheckingAccess(false);
       }
@@ -91,7 +95,7 @@ export default function StoriatsAdminSettingsPage() {
     }
   };
 
-  if (isCheckingAccess) {
+  if (isCheckingAccess || isAdmin === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
         <Spinner className="w-8 h-8 text-indigo-600" />
@@ -113,7 +117,7 @@ export default function StoriatsAdminSettingsPage() {
     );
   }
 
-  if (!isStoriatsAdmin(user.email)) {
+  if (!isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
         <Card className="max-w-md w-full p-6">

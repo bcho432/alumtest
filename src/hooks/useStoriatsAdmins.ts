@@ -51,6 +51,7 @@ export const useStoriatsAdmins = () => {
           return cachedSettings;
         }
 
+        setLoading(true); // Set loading state before fetch
         const { db } = await getFirebaseServices();
         if (!db) throw new Error('Firestore instance not available');
 
@@ -113,6 +114,7 @@ export const useStoriatsAdmins = () => {
 
   const addAdmin = async (email: string, name: string, addedBy: string) => {
     try {
+      setLoading(true); // Set loading state before operation
       // Ensure settings are loaded
       if (!settings) {
         console.log('Settings not loaded, fetching...');
@@ -139,17 +141,24 @@ export const useStoriatsAdmins = () => {
         updatedBy: addedBy
       });
 
+      // Invalidate cache
+      cachedSettings = null;
+      lastFetchTime = 0;
+      
       await fetchSettings(true); // Force refresh
       toast('Storiats admin added successfully', 'success');
     } catch (error) {
       console.error('Error adding Storiats admin:', error);
       toast('Failed to add Storiats admin', 'error');
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const removeAdmin = async (email: string, updatedBy: string) => {
     try {
+      setLoading(true); // Set loading state before operation
       // Ensure settings are loaded
       if (!settings) {
         console.log('Settings not loaded, fetching...');
@@ -180,12 +189,18 @@ export const useStoriatsAdmins = () => {
         updatedBy
       });
 
+      // Invalidate cache
+      cachedSettings = null;
+      lastFetchTime = 0;
+      
       await fetchSettings(true); // Force refresh
       toast('Storiats admin removed successfully', 'success');
     } catch (error) {
       console.error('Error removing Storiats admin:', error);
       toast('Failed to remove Storiats admin', 'error');
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
