@@ -27,24 +27,6 @@ const values = [
   }
 ];
 
-const team = [
-  {
-    name: 'Matthew Bo',
-    role: 'Founder & CEO',
-    bio: 'Passionate about creating meaningful digital experiences that honor and preserve memories.'
-  },
-  {
-    name: 'Derek Lee',
-    role: 'CTO',
-    bio: 'Expert in building scalable and secure platforms that make a difference.'
-  },
-  {
-    name: 'Justin Lontoh',
-    role: 'Head of Product',
-    bio: 'Dedicated to creating intuitive and beautiful user experiences.'
-  }
-];
-
 export default function About() {
   return (
     <div className="bg-white">
@@ -154,35 +136,6 @@ export default function About() {
             </div>
           ))}
         </dl>
-      </div>
-
-      {/* Team section */}
-      <div className="mx-auto mt-32 max-w-7xl px-6 sm:mt-40 lg:px-8">
-        <div className="mx-auto max-w-2xl lg:mx-0">
-          <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Our Team</h2>
-          <p className="mt-6 text-lg leading-8 text-gray-600">
-            Memory Vista was founded by a team of dedicated professionals who understand the importance of preserving memories and honoring loved ones.
-          </p>
-        </div>
-        <ul
-          role="list"
-          className="mx-auto mt-20 grid max-w-2xl grid-cols-1 gap-x-8 gap-y-14 sm:grid-cols-2 lg:mx-0 lg:max-w-none lg:grid-cols-3 xl:grid-cols-4"
-        >
-          {team.map((person) => (
-            <li key={person.name}>
-              <div className="flex items-center gap-x-4">
-                <div className="h-16 w-16 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xl font-bold">
-                  {person.name.charAt(0)}
-                </div>
-                <div>
-                  <h3 className="text-base font-semibold leading-7 tracking-tight text-gray-900">{person.name}</h3>
-                  <p className="text-sm font-semibold leading-6 text-indigo-600">{person.role}</p>
-                </div>
-              </div>
-              <p className="mt-4 text-sm leading-6 text-gray-600">{person.bio}</p>
-            </li>
-          ))}
-        </ul>
       </div>
 
       {/* CTA section */}
