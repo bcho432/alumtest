@@ -42,36 +42,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     console.log('[Auth Context] Setting up auth state listener');
     
-    const setupAuth = async () => {
-      const { auth } = await getFirebaseServices();
-      if (!auth) {
-        console.error('[Auth Context] No auth instance available');
-        setLoading(false);
-        return;
-      }
-
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
-        console.log('[Auth Context] Auth state changed:', {
-          userId: user?.uid,
-          email: user?.email,
-          isAnonymous: user?.isAnonymous,
-          providerId: user?.providerId
-        });
-        
-        setUser(user);
-        setLoading(false);
-      });
-
-      return () => {
-        console.log('[Auth Context] Cleaning up auth state listener');
-        unsubscribe();
-      };
-    };
-
-    setupAuth();
-  }, []);
-
-  useEffect(() => {
     const initAuth = async () => {
       try {
         const { auth } = await getFirebaseServices();
@@ -80,7 +50,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         return onAuthStateChanged(auth, async (user) => {
-          console.log('Auth state changed:', user?.uid);
+          console.log('[Auth Context] Auth state changed:', {
+            userId: user?.uid,
+            email: user?.email,
+            isAnonymous: user?.isAnonymous,
+            providerId: user?.providerId
+          });
+          
           setUser(user);
           
           if (user) {
@@ -98,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 
                 const isUserAdmin = isLocalAdmin || isStoriatsAdminUser;
                 
-                console.log('Admin status check:', {
+                console.log('[Auth Context] Admin status check:', {
                   email: user.email,
                   isLocalAdmin,
                   isStoriatsAdminUser,
@@ -114,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 });
               } else {
                 // Handle case where user document doesn't exist
-                console.warn('User document not found for:', user.uid);
+                console.warn('[Auth Context] User document not found for:', user.uid);
                 setIsAdmin(false);
                 setUserRoles({
                   isAdmin: false,
@@ -124,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 });
               }
             } catch (error) {
-              console.error('Error checking admin status:', error);
+              console.error('[Auth Context] Error checking admin status:', error);
               setIsAdmin(false);
               setUserRoles({
                 isAdmin: false,
@@ -147,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setInitializing(false);
         });
       } catch (error) {
-        console.error('Error initializing auth:', error);
+        console.error('[Auth Context] Error initializing auth:', error);
         setInitializing(false);
         setLoading(false);
         setLastError(error instanceof Error ? error : new Error('Failed to initialize auth'));
