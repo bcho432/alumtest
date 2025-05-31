@@ -1,227 +1,156 @@
 "use client";
 
-import { useState, useCallback, useMemo } from 'react';
-import { TimelineEvent } from '../types/profile';
+import { useState, useCallback, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { collection, query, where, orderBy, limit, startAfter, getDocs, DocumentData } from 'firebase/firestore';
+import { getFirebaseServices } from '@/lib/firebase';
+import { TimelineEvent } from '@/types/profile';
 import { useToast } from './useToast';
 import { useAnalytics } from './useAnalytics';
 
 interface UseTimelineOptions {
+  orgId: string;
+  profileId: string;
+  pageSize?: number;
   initialEvents?: TimelineEvent[];
-  onEventsChange?: (events: TimelineEvent[]) => void;
 }
 
-interface TimelineFilters {
-  searchTerm?: string;
-  eventTypes?: ('education' | 'job' | 'event')[];
-  dateRange?: {
-    start?: string;
-    end?: string;
-  };
+interface UseTimelineResult {
+  events: TimelineEvent[];
+  isLoading: boolean;
+  error: Error | null;
+  hasMore: boolean;
+  loadMore: () => Promise<void>;
+  refresh: () => Promise<void>;
+  isRefreshing: boolean;
 }
 
-export const useTimeline = ({ initialEvents = [], onEventsChange }: UseTimelineOptions = {}) => {
-  const [events, setEvents] = useState<TimelineEvent[]>(initialEvents);
-  const [filters, setFilters] = useState<TimelineFilters>({});
-  const [isLoading, setIsLoading] = useState(false);
+const STALE_TIME = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_PAGE_SIZE = 20;
+
+export function useTimeline({
+  orgId,
+  profileId,
+  pageSize = DEFAULT_PAGE_SIZE,
+  initialEvents = [],
+}: UseTimelineOptions): UseTimelineResult {
+  const [lastDoc, setLastDoc] = useState<DocumentData | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { showToast } = useToast();
+  const queryClient = useQueryClient();
   const { trackEvent } = useAnalytics();
 
-  const filteredEvents = useMemo(() => {
-    return events.filter((event) => {
-      // Apply search term filter
-      if (filters.searchTerm) {
-        const searchLower = filters.searchTerm.toLowerCase();
-        const matchesSearch =
-          event.title.toLowerCase().includes(searchLower) ||
-          event.description?.toLowerCase().includes(searchLower) ||
-          event.location?.toLowerCase().includes(searchLower) ||
-          (event.metadata?.institution && event.metadata.institution.toLowerCase().includes(searchLower)) ||
-          (event.metadata?.company && event.metadata.company.toLowerCase().includes(searchLower));
-        if (!matchesSearch) return false;
-      }
+  const fetchEvents = useCallback(async (lastDocument?: DocumentData) => {
+    try {
+      const { db } = await getFirebaseServices();
+      const collectionPath = `universities/${orgId}/profiles/${profileId}/events`;
+      const eventsRef = collection(db, collectionPath);
+      
+      let q = query(
+        eventsRef,
+        orderBy('startDate', 'desc'),
+        limit(pageSize)
+      );
 
-      // Apply event type filter
-      if (filters.eventTypes?.length) {
-        if (!filters.eventTypes.includes(event.type)) return false;
-      }
-
-      // Apply date range filter
-      if (filters.dateRange?.start || filters.dateRange?.end) {
-        const eventDate = new Date(event.startDate);
-        if (filters.dateRange.start && eventDate < new Date(filters.dateRange.start)) return false;
-        if (filters.dateRange.end && eventDate > new Date(filters.dateRange.end)) return false;
-      }
-
-      return true;
-    });
-  }, [events, filters]);
-
-  const addEvent = useCallback(
-    async (newEvent: Omit<TimelineEvent, 'id'>) => {
-      try {
-        setIsLoading(true);
-        const event: TimelineEvent = {
-          id: crypto.randomUUID(),
-          ...newEvent,
-        };
-
-        const updatedEvents = [...events, event];
-        setEvents(updatedEvents);
-        onEventsChange?.(updatedEvents);
-
-        trackEvent('timeline_event_added', {
-          eventType: event.type,
-          hasLocation: !!event.location,
-          hasDescription: !!event.description,
-        });
-
-        showToast({
-          title: 'Event Added',
-          description: 'The timeline event has been added successfully.',
-          status: 'success',
-        });
-
-        return event;
-      } catch (error) {
-        console.error('Error adding timeline event:', error);
-        showToast({
-          title: 'Error',
-          description: error instanceof Error ? error.message : 'Failed to add timeline event.',
-          status: 'error',
-        });
-        throw error;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [events, onEventsChange, showToast, trackEvent]
-  );
-
-  const updateEvent = useCallback(
-    async (eventId: string, updates: Partial<TimelineEvent>) => {
-      try {
-        setIsLoading(true);
-        const updatedEvents = events.map((event) =>
-          event.id === eventId ? { ...event, ...updates } : event
+      if (lastDocument) {
+        q = query(
+          eventsRef,
+          orderBy('startDate', 'desc'),
+          startAfter(lastDocument),
+          limit(pageSize)
         );
-        setEvents(updatedEvents);
-        onEventsChange?.(updatedEvents);
-
-        trackEvent('timeline_event_updated', {
-          eventId,
-          updateFields: Object.keys(updates),
-        });
-
-        showToast({
-          title: 'Event Updated',
-          description: 'The timeline event has been updated successfully.',
-          status: 'success',
-        });
-      } catch (error) {
-        console.error('Error updating timeline event:', error);
-        showToast({
-          title: 'Error',
-          description: error instanceof Error ? error.message : 'Failed to update timeline event.',
-          status: 'error',
-        });
-        throw error;
-      } finally {
-        setIsLoading(false);
       }
-    },
-    [events, onEventsChange, showToast, trackEvent]
-  );
 
-  const deleteEvent = useCallback(
-    async (eventId: string) => {
-      try {
-        setIsLoading(true);
-        const updatedEvents = events.filter((event) => event.id !== eventId);
-        setEvents(updatedEvents);
-        onEventsChange?.(updatedEvents);
+      const snapshot = await getDocs(q);
+      const events = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as TimelineEvent[];
 
-        trackEvent('timeline_event_deleted', {
-          eventId,
-          remainingEvents: updatedEvents.length,
-        });
+      setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+      setHasMore(snapshot.docs.length === pageSize);
 
-        showToast({
-          title: 'Event Deleted',
-          description: 'The timeline event has been deleted successfully.',
-          status: 'success',
-        });
-      } catch (error) {
-        console.error('Error deleting timeline event:', error);
-        showToast({
-          title: 'Error',
-          description: error instanceof Error ? error.message : 'Failed to delete timeline event.',
-          status: 'error',
-        });
-        throw error;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [events, onEventsChange, showToast, trackEvent]
-  );
+      return events;
+    } catch (error) {
+      console.error('Error fetching timeline events:', error);
+      throw error;
+    }
+  }, [orgId, profileId, pageSize]);
 
-  const reorderEvents = useCallback(
-    async (reorderedEvents: TimelineEvent[]) => {
-      try {
-        setIsLoading(true);
-        setEvents(reorderedEvents);
-        onEventsChange?.(reorderedEvents);
+  const {
+    data: events = initialEvents,
+    isLoading,
+    error,
+    refetch
+  } = useQuery<TimelineEvent[], Error>({
+    queryKey: ['timeline-events', orgId, profileId],
+    queryFn: () => fetchEvents(),
+    staleTime: STALE_TIME,
+    gcTime: STALE_TIME,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
 
-        trackEvent('timeline_events_reordered', {
-          eventCount: reorderedEvents.length,
-        });
+  const loadMore = useCallback(async () => {
+    if (!hasMore || isLoading) return;
 
-        showToast({
-          title: 'Timeline Updated',
-          description: 'The timeline events have been reordered successfully.',
-          status: 'success',
-        });
-      } catch (error) {
-        console.error('Error reordering timeline events:', error);
-        showToast({
-          title: 'Error',
-          description: error instanceof Error ? error.message : 'Failed to reorder timeline events.',
-          status: 'error',
-        });
-        throw error;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [onEventsChange, showToast, trackEvent]
-  );
-
-  const applyFilters = useCallback(
-    (newFilters: TimelineFilters) => {
-      setFilters(newFilters);
-      trackEvent('timeline_filter_applied', {
-        filterCount: Object.keys(newFilters).length,
-        eventTypes: newFilters.eventTypes,
-        hasDateRange: !!(newFilters.dateRange?.start || newFilters.dateRange?.end),
+    try {
+      const newEvents = await fetchEvents(lastDoc || undefined);
+      queryClient.setQueryData<TimelineEvent[]>(
+        ['timeline-events', orgId, profileId],
+        (old = []) => [...old, ...newEvents]
+      );
+    } catch (error) {
+      console.error('Error loading more events:', error);
+      showToast({
+        title: 'Error',
+        description: 'Failed to load more events. Please try again.',
+        status: 'error',
       });
-    },
-    [trackEvent]
-  );
+    }
+  }, [hasMore, isLoading, lastDoc, fetchEvents, queryClient, orgId, profileId, showToast]);
 
-  const clearFilters = useCallback(() => {
-    setFilters({});
-    trackEvent('timeline_filters_cleared');
-  }, [trackEvent]);
+  const refresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      setLastDoc(null);
+      setHasMore(true);
+      showToast({
+        title: 'Success',
+        description: 'Timeline refreshed successfully',
+        status: 'success',
+      });
+    } catch (error) {
+      console.error('Error refreshing timeline:', error);
+      showToast({
+        title: 'Error',
+        description: 'Failed to refresh timeline. Please try again.',
+        status: 'error',
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refetch, showToast]);
+
+  // Prefetch next page
+  useEffect(() => {
+    if (hasMore && !isLoading) {
+      queryClient.prefetchQuery<TimelineEvent[], Error>({
+        queryKey: ['timeline-events', orgId, profileId, 'next'],
+        queryFn: () => fetchEvents(lastDoc || undefined),
+      });
+    }
+  }, [hasMore, isLoading, lastDoc, fetchEvents, queryClient, orgId, profileId]);
 
   return {
-    events: filteredEvents,
+    events,
     isLoading,
-    addEvent,
-    updateEvent,
-    deleteEvent,
-    reorderEvents,
-    applyFilters,
-    clearFilters,
-    currentFilters: filters,
+    error: error as Error | null,
+    hasMore,
+    loadMore,
+    refresh,
+    isRefreshing,
   };
-}; 
+} 

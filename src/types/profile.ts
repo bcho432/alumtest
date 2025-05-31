@@ -659,4 +659,5 @@ export interface MemorialProfileFormData extends Omit<MemorialProfile, 'basicInf
     updatedAt: Date | Timestamp;
   };
   timelineEvents?: TimelineEvent[];
+  mediaUrls?: string[];
 } 

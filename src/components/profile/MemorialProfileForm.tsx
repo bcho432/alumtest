@@ -12,11 +12,12 @@ import { TabsRoot, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Ta
 import { Switch } from '@/components/ui/Switch';
 import { Card } from '@/components/ui/Card';
 import { Dialog } from '@/components/ui/Dialog';
-import { MediaGallery } from '@/components/media/MediaGallery';
+import { TimelineMediaUpload } from '@/components/media/TimelineMediaUpload';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
-import { TimelineBuilder } from '@/components/timeline/TimelineBuilder';
+import { SimpleTimelineBuilder } from '@/components/timeline/SimpleTimelineBuilder';
 import debounce from 'lodash/debounce';
 import { Timestamp } from 'firebase/firestore';
+import { LifeStoryEditor } from '@/components/profile/LifeStoryEditor';
 
 interface MemorialProfileFormProps {
   profile?: MemorialProfile;
@@ -521,15 +522,22 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Life Story
                   </label>
-                  <RichTextEditor
+                  <LifeStoryEditor
                     value={formData.lifeStory?.content || ''}
-                    onChange={(value) => updateFormData({
-                      lifeStory: {
-                        ...formData.lifeStory!,
-                        content: value,
-                        updatedAt: new Date()
-                      }
-                    })}
+                    onChange={(content) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        lifeStory: {
+                          ...prev.lifeStory,
+                          content,
+                          updatedAt: new Date(),
+                        },
+                      }));
+                    }}
+                    onImageUpload={async (file) => {
+                      // TODO: Implement image upload
+                      return URL.createObjectURL(file);
+                    }}
                   />
                   {errors.lifeStory && (
                     <p className="mt-1 text-sm text-red-600">{errors.lifeStory}</p>
@@ -543,13 +551,10 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
             <Card className="p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Life Timeline</h3>
               <div className="mt-4">
-                <TimelineBuilder
-                  existingEvents={formData.timelineEvents || []}
+                <SimpleTimelineBuilder
+                  existingEvents={formData.timelineEvents}
                   onUpdate={async (events) => {
-                    setFormData(prev => ({
-                      ...prev,
-                      timelineEvents: events
-                    }));
+                    setFormData((prev) => ({ ...prev, timelineEvents: events }));
                   }}
                   isSubmitting={loading}
                 />
@@ -561,7 +566,13 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
             <Card className="p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Media Gallery</h3>
               <div className="mt-4">
-                <MediaGallery profileId={formData.id || 'new'} />
+                <TimelineMediaUpload
+                  eventId={formData.id || 'new'}
+                  existingMedia={formData.mediaUrls || []}
+                  onMediaChange={(urls) => {
+                    setFormData((prev) => ({ ...prev, mediaUrls: urls }));
+                  }}
+                />
               </div>
             </Card>
           </TabsContent>

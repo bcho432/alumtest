@@ -1,14 +1,17 @@
-import React from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useCallback } from 'react';
+import { useRouter } from 'next/router';
 import { Button } from '@/components/ui/Button';
-import { useAuth } from '@/contexts/AuthContext';
+import { Icon } from '@/components/ui/Icon';
+import { useAuth } from '@/hooks/useAuth';
 import { useCreateProfile } from '@/hooks/useCreateProfile';
 import { toast } from 'react-hot-toast';
-import { Icon } from '@/components/ui/Icon';
+import { Timestamp } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
+import { getFirebaseServices } from '@/lib/firebase';
 
 interface CreateProfileButtonProps {
   universityId: string;
-  profileType: 'personal' | 'memorial';
+  profileType: 'memorial' | 'personal';
   className?: string;
 }
 
@@ -21,35 +24,107 @@ export const CreateProfileButton: React.FC<CreateProfileButtonProps> = ({
   const { user } = useAuth();
   const { createProfile, loading } = useCreateProfile();
 
+  const pollForProfile = useCallback(async (profileId: string, collectionPath: string) => {
+    const { db } = await getFirebaseServices();
+    const profileRef = doc(db, collectionPath, profileId);
+    
+    const maxAttempts = 10; // Increased from 5 to 10
+    const pollInterval = 2000; // Increased from 1s to 2s
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+      console.log(`[CreateProfileButton] Polling attempt ${attempts + 1}/${maxAttempts}`);
+      try {
+        const profileDoc = await getDoc(profileRef);
+        
+        if (profileDoc.exists()) {
+          console.log('[CreateProfileButton] Profile found in database');
+          return true;
+        }
+
+        console.log('[CreateProfileButton] Profile not found yet, waiting...');
+        attempts++;
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      } catch (error) {
+        console.error('[CreateProfileButton] Error during polling:', error);
+        attempts++;
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      }
+    }
+
+    return false;
+  }, []);
+
   const handleCreate = async () => {
     if (!user) {
-      console.log('User not authenticated');
+      console.log('[CreateProfileButton] User not authenticated');
       toast.error('Please sign in to create a profile');
       return;
     }
 
     try {
-      console.log('Creating new profile:', { universityId, profileType });
+      console.log('[CreateProfileButton] Starting profile creation:', { universityId, profileType });
+      
+      // Create the profile
       const profileId = await createProfile({
         universityId,
         type: profileType,
         status: 'draft',
         createdBy: user.uid,
-        updatedBy: user.uid
+        updatedBy: user.uid,
+        name: '',
+        description: '',
+        imageUrl: '',
+        basicInfo: {
+          dateOfBirth: undefined,
+          dateOfDeath: undefined,
+          biography: '',
+          photo: '',
+          birthLocation: '',
+          deathLocation: ''
+        },
+        lifeStory: {
+          content: '',
+          updatedAt: Timestamp.now()
+        },
+        isPublic: false,
+        metadata: {
+          tags: [],
+          categories: [],
+          lastModifiedBy: user.uid,
+          lastModifiedAt: Timestamp.now(),
+          version: 1
+        }
       });
 
-      console.log('Profile created successfully:', profileId);
-      toast.success(`${profileType === 'memorial' ? 'Memorial' : 'Profile'} created successfully`);
+      console.log('[CreateProfileButton] Profile created with ID:', profileId);
 
-      // Redirect to the edit page directly
-      if (profileType === 'memorial') {
-        router.push(`/${universityId}/memorials/${profileId}/edit`);
+      // Determine the collection path
+      const collectionPath = profileType === 'memorial' 
+        ? `universities/${universityId}/profiles`
+        : 'profiles';
+      
+      console.log('[CreateProfileButton] Checking profile in collection:', collectionPath);
+      
+      // Poll for the profile to be saved
+      const profileExists = await pollForProfile(profileId, collectionPath);
+      
+      if (profileExists) {
+        const targetPath = profileType === 'memorial'
+          ? `/${universityId}/memorials/${profileId}/edit`
+          : `/${universityId}/profiles/${profileId}/edit`;
+        
+        console.log('[CreateProfileButton] Redirecting to:', targetPath);
+        
+        // Use replace instead of push to prevent back button issues
+        await router.replace(targetPath);
       } else {
-        router.push(`/${universityId}/profiles/${profileId}/edit`);
+        console.log('[CreateProfileButton] Profile not found after all attempts');
+        toast.error('Profile creation is taking longer than expected. Please try refreshing the page.');
       }
     } catch (error) {
-      console.error('Error creating profile:', error);
-      toast.error('Failed to create profile');
+      console.error('[CreateProfileButton] Error in profile creation:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to create profile');
     }
   };
 

@@ -1,35 +1,77 @@
-import React from 'react';
-import { Button } from '../ui/Button';
-import { Icon } from '../ui/Icon';
+import React, { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
+import { MediaService } from '@/services/MediaService';
 import { TimelineMediaGallery } from './TimelineMediaGallery';
 
 interface TimelineMediaUploadProps {
   eventId: string;
   existingMedia: string[];
-  onMediaChange: (urls: string[]) => void;
+  onMediaChange: (mediaUrls: string[]) => void;
 }
 
 export const TimelineMediaUpload: React.FC<TimelineMediaUploadProps> = ({
   eventId,
   existingMedia,
-  onMediaChange,
+  onMediaChange
 }) => {
-  const handleFileChange = async (files: File[]) => {
-    if (files.length === 0) return;
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ file: File; progress: number }[]>([]);
 
-    // TODO: Implement actual file upload logic
-    // For now, we'll just simulate it with placeholder URLs
-    const newUrls = files.map((_, index) => `https://example.com/media/${eventId}/${index}`);
-    onMediaChange([...existingMedia, ...newUrls]);
+  const handleFileChange = async (files: File[]) => {
+    if (!user) {
+      showToast({ title: 'Please sign in to upload media', status: 'error' });
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      const progress: { file: File; progress: number }[] = files.map(file => ({
+        file,
+        progress: 0
+      }));
+      setUploadProgress(progress);
+
+      const results = await MediaService.bulkUploadMedia(
+        files,
+        eventId,
+        user.uid,
+        [],
+        (uploadProgress) => {
+          setUploadProgress(uploadProgress.map(up => ({
+            file: up.file,
+            progress: up.progress
+          })));
+        }
+      );
+
+      if (results.success.length > 0) {
+        const newMediaUrls = [...existingMedia, ...results.success];
+        onMediaChange(newMediaUrls);
+        showToast({ title: 'Media uploaded successfully', status: 'success' });
+      }
+
+      if (results.failed.length > 0) {
+        showToast({ title: `${results.failed.length} file(s) failed to upload`, status: 'error' });
+      }
+    } catch (error) {
+      console.error('Error uploading media:', error);
+      showToast({ title: 'Failed to upload media', status: 'error' });
+    } finally {
+      setIsUploading(false);
+      setUploadProgress([]);
+    }
   };
 
   return (
-    <div className="space-y-4">
-      <TimelineMediaGallery
-        mediaUrls={existingMedia}
-        onUpload={handleFileChange}
-        isEditable={true}
-      />
-    </div>
+    <TimelineMediaGallery
+      mediaUrls={existingMedia}
+      onUpload={handleFileChange}
+      isEditable={true}
+      isUploading={isUploading}
+      uploadProgress={uploadProgress}
+    />
   );
 }; 

@@ -12,6 +12,9 @@
     "init-admin": "node scripts/init-admin-settings.js"
   },
   "dependencies": {
+    "@chakra-ui/react": "^3.19.1",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
     "@headlessui/react": "^1.7.18",
     "@heroicons/react": "^2.1.1",
     "@hookform/resolvers": "^3.3.4",
@@ -34,7 +37,7 @@
     "dotenv": "^16.5.0",
     "firebase": "10.7.1",
     "firebase-admin": "^13.4.0",
-    "framer-motion": "^11.0.5",
+    "framer-motion": "^11.18.2",
     "lru-cache": "^11.1.0",
     "lucide-react": "^0.511.0",
     "next": "^14.1.0",

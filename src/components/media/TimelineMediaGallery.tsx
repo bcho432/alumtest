@@ -7,12 +7,16 @@ interface TimelineMediaGalleryProps {
   mediaUrls: string[];
   onUpload?: (files: File[]) => Promise<void>;
   isEditable?: boolean;
+  isUploading?: boolean;
+  uploadProgress?: { file: File; progress: number }[];
 }
 
 export const TimelineMediaGallery: React.FC<TimelineMediaGalleryProps> = ({
   mediaUrls,
   onUpload,
   isEditable = false,
+  isUploading = false,
+  uploadProgress = [],
 }) => {
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -47,7 +51,7 @@ export const TimelineMediaGallery: React.FC<TimelineMediaGalleryProps> = ({
         ))}
       </div>
 
-      {isEditable && onUpload && (
+      {isEditable && (
         <div className="flex justify-center">
           <Tooltip content="Upload media">
             <label className="cursor-pointer">
@@ -57,13 +61,36 @@ export const TimelineMediaGallery: React.FC<TimelineMediaGalleryProps> = ({
                 accept="image/*,video/*"
                 className="hidden"
                 onChange={handleFileChange}
+                disabled={isUploading}
               />
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" disabled={isUploading}>
                 <Icon name="upload" className="h-4 w-4 mr-2" />
-                Upload Media
+                {isUploading ? 'Uploading...' : 'Upload Media'}
               </Button>
             </label>
           </Tooltip>
+        </div>
+      )}
+
+      {uploadProgress.length > 0 && (
+        <div className="fixed bottom-4 right-4 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 z-50">
+          <h4 className="font-medium mb-2">Uploading {uploadProgress.length} file(s)</h4>
+          <div className="space-y-2">
+            {uploadProgress.map((item, index) => (
+              <div key={index} className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="truncate">{item.file.name}</span>
+                  <span>{Math.round(item.progress)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${item.progress}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
