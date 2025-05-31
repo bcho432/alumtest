@@ -104,40 +104,8 @@ export function useCreateProfile() {
             photo: params.basicInfo?.photo || '',
             birthLocation: params.basicInfo?.birthLocation || '',
             deathLocation: params.basicInfo?.deathLocation || '',
-            dateOfBirth: params.basicInfo?.dateOfBirth 
-              ? (params.basicInfo.dateOfBirth instanceof Timestamp 
-                ? params.basicInfo.dateOfBirth 
-                : (() => {
-                    try {
-                      const date = new Date(params.basicInfo.dateOfBirth);
-                      if (isNaN(date.getTime())) {
-                        console.warn('Invalid date of birth, setting to null');
-                        return null;
-                      }
-                      return Timestamp.fromDate(date);
-                    } catch (error) {
-                      console.warn('Error converting date of birth, setting to null:', error);
-                      return null;
-                    }
-                  })())
-              : null,
-            dateOfDeath: params.basicInfo?.dateOfDeath
-              ? (params.basicInfo.dateOfDeath instanceof Timestamp
-                ? params.basicInfo.dateOfDeath
-                : (() => {
-                    try {
-                      const date = new Date(params.basicInfo.dateOfDeath);
-                      if (isNaN(date.getTime())) {
-                        console.warn('Invalid date of death, setting to null');
-                        return null;
-                      }
-                      return Timestamp.fromDate(date);
-                    } catch (error) {
-                      console.warn('Error converting date of death, setting to null:', error);
-                      return null;
-                    }
-                  })())
-              : null
+            dateOfBirth: null,
+            dateOfDeath: null
           },
           lifeStory: {
             content: params.lifeStory?.content || '',

@@ -145,8 +145,8 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
                   description: '',
                   imageUrl: '',
                   basicInfo: {
-                    dateOfBirth: Timestamp.now(),
-                    dateOfDeath: Timestamp.now(),
+                    dateOfBirth: null,
+                    dateOfDeath: null,
                     biography: '',
                     photo: '',
                     birthLocation: '',

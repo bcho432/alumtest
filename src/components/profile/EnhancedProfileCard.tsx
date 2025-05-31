@@ -113,13 +113,29 @@ export const EnhancedProfileCard: React.FC<EnhancedProfileCardProps> = ({
               {profile.type === 'memorial' && (profile as any).basicInfo && (
                 <div className="text-sm text-gray-500">
                   {(() => {
-                    const dob = (profile as any).basicInfo.dateOfBirth;
-                    const dod = (profile as any).basicInfo.dateOfDeath;
-                    const formatDate = (date: Date | Timestamp) => {
-                      if (date instanceof Timestamp) {
-                        return date.toDate().toLocaleDateString();
+                    const dob = (profile as any).basicInfo?.dateOfBirth;
+                    const dod = (profile as any).basicInfo?.dateOfDeath;
+                    const formatDate = (date: Date | Timestamp | null | undefined): string => {
+                      if (!date) return 'Not specified';
+                      try {
+                        if (date instanceof Timestamp) {
+                          return date.toDate().toLocaleDateString();
+                        }
+                        if (date instanceof Date) {
+                          return date.toLocaleDateString();
+                        }
+                        // Handle string dates
+                        if (typeof date === 'string') {
+                          const parsedDate = new Date(date);
+                          if (!isNaN(parsedDate.getTime())) {
+                            return parsedDate.toLocaleDateString();
+                          }
+                        }
+                        return 'Invalid date';
+                      } catch (error) {
+                        console.error('Error formatting date:', error);
+                        return 'Invalid date';
                       }
-                      return date.toLocaleDateString();
                     };
                     return `${formatDate(dob)} - ${formatDate(dod)}`;
                   })()}
