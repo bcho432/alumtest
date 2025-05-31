@@ -14,7 +14,7 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col bg-white relative overflow-x-hidden">
       {/* Hero Section with Animated Blobs */}
-      <section className="relative flex flex-col items-center justify-center text-center max-w-4xl mx-auto px-6 pt-24 pb-16 md:pb-32 w-full z-10 bg-gradient-to-br from-indigo-100 via-purple-100 to-white rounded-b-3xl shadow-xl overflow-hidden">
+      <section className="relative flex flex-col items-center justify-center text-center w-full px-6 pt-24 pb-16 md:pb-32 z-10 bg-gradient-to-br from-indigo-100 via-purple-100 to-white shadow-xl overflow-hidden">
         <AnimatedBlobs />
         <div className="flex flex-col items-center animate-fade-in-up relative z-10">
           <div className="flex items-center gap-3 mb-6">
