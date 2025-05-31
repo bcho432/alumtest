@@ -100,6 +100,10 @@ export function useCreateProfile() {
           description: params.description || '',
           imageUrl: params.imageUrl || '',
           basicInfo: {
+            biography: params.basicInfo?.biography || '',
+            photo: params.basicInfo?.photo || '',
+            birthLocation: params.basicInfo?.birthLocation || '',
+            deathLocation: params.basicInfo?.deathLocation || '',
             dateOfBirth: params.basicInfo?.dateOfBirth 
               ? (params.basicInfo.dateOfBirth instanceof Timestamp 
                 ? params.basicInfo.dateOfBirth 
@@ -133,11 +137,7 @@ export function useCreateProfile() {
                       return null;
                     }
                   })())
-              : null,
-            biography: params.basicInfo?.biography || '',
-            photo: params.basicInfo?.photo || '',
-            birthLocation: params.basicInfo?.birthLocation || '',
-            deathLocation: params.basicInfo?.deathLocation || ''
+              : null
           },
           lifeStory: {
             content: params.lifeStory?.content || '',
