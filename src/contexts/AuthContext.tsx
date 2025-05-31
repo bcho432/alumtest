@@ -40,6 +40,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { isStoriatsAdmin } = useStoriatsAdmins();
 
   useEffect(() => {
+    console.log('[Auth Context] Setting up auth state listener');
+    
+    const setupAuth = async () => {
+      const { auth } = await getFirebaseServices();
+      if (!auth) {
+        console.error('[Auth Context] No auth instance available');
+        setLoading(false);
+        return;
+      }
+
+      const unsubscribe = onAuthStateChanged(auth, (user) => {
+        console.log('[Auth Context] Auth state changed:', {
+          userId: user?.uid,
+          email: user?.email,
+          isAnonymous: user?.isAnonymous,
+          providerId: user?.providerId
+        });
+        
+        setUser(user);
+        setLoading(false);
+      });
+
+      return () => {
+        console.log('[Auth Context] Cleaning up auth state listener');
+        unsubscribe();
+      };
+    };
+
+    setupAuth();
+  }, []);
+
+  useEffect(() => {
     const initAuth = async () => {
       try {
         const { auth } = await getFirebaseServices();

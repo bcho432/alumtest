@@ -34,20 +34,34 @@ export default function StoriatsAdminSettingsPage() {
 
   useEffect(() => {
     const checkAccess = async () => {
+      console.log('[Admin Check] Starting access check, user:', user?.email);
+      
       if (!user?.email) {
+        console.log('[Admin Check] No user email, denying access');
         setIsCheckingAccess(false);
         setIsAdmin(false);
         return;
       }
 
       try {
+        console.log('[Admin Check] Checking admin status for:', user.email);
         const adminStatus = isStoriatsAdmin(user.email);
+        console.log('[Admin Check] Admin status result:', {
+          email: user.email,
+          isAdmin: adminStatus,
+          settings: settings ? {
+            adminCount: settings.adminEmails.length,
+            lastUpdated: settings.lastUpdated
+          } : 'no settings'
+        });
+        
         setIsAdmin(adminStatus);
         if (adminStatus) {
+          console.log('[Admin Check] User is admin, refreshing settings');
           await refreshSettings();
         }
       } catch (error) {
-        console.error('Error checking admin access:', error);
+        console.error('[Admin Check] Error checking admin access:', error);
         toast('Error checking admin access', 'error');
         setIsAdmin(false);
       } finally {
@@ -56,7 +70,17 @@ export default function StoriatsAdminSettingsPage() {
     };
 
     checkAccess();
-  }, [user?.email, isStoriatsAdmin, refreshSettings, toast]);
+  }, [user?.email, isStoriatsAdmin, refreshSettings, toast, settings]);
+
+  // Add effect to track auth state changes
+  useEffect(() => {
+    console.log('[Auth State] Changed:', {
+      userId: user?.uid,
+      email: user?.email,
+      isCheckingAccess,
+      isAdmin
+    });
+  }, [user, isCheckingAccess, isAdmin]);
 
   const handleAddAdmin = async () => {
     if (!user?.email) return;
@@ -158,8 +182,13 @@ export default function StoriatsAdminSettingsPage() {
               <Button
                 variant="outline"
                 onClick={() => refreshSettings()}
+                disabled={loading}
               >
-                <Icon name="reload" className="w-4 h-4 mr-2" />
+                {loading ? (
+                  <Spinner className="w-4 h-4 mr-2" />
+                ) : (
+                  <Icon name="arrow-path" className="w-4 h-4 mr-2" />
+                )}
                 Refresh
               </Button>
             </div>

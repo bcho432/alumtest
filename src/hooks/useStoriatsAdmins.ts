@@ -36,11 +36,15 @@ export const useStoriatsAdmins = () => {
   const [error, setError] = useState<Error | null>(null);
   const { toast } = useToast();
   const fetchInProgress = useRef(false);
+  const fetchCount = useRef(0);
 
   const fetchSettings = useCallback(async (force = false) => {
+    const fetchId = ++fetchCount.current;
+    console.log(`[Fetch ${fetchId}] Starting fetch, force: ${force}, inProgress: ${fetchInProgress.current}`);
+
     // Prevent multiple simultaneous fetches
     if (fetchInProgress.current) {
-      console.log('Fetch already in progress, skipping...');
+      console.log(`[Fetch ${fetchId}] Fetch already in progress, returning cached settings`);
       return cachedSettings;
     }
 
@@ -51,7 +55,7 @@ export const useStoriatsAdmins = () => {
       // Use cache if available and not expired
       const now = Date.now();
       if (!force && cachedSettings && (now - lastFetchTime) < CACHE_DURATION) {
-        console.log('Using cached admin settings:', cachedSettings);
+        console.log(`[Fetch ${fetchId}] Using cached settings, age: ${(now - lastFetchTime) / 1000}s`);
         setSettings(cachedSettings);
         setLoading(false);
         setError(null);
@@ -59,10 +63,11 @@ export const useStoriatsAdmins = () => {
       }
 
       setLoading(true);
+      console.log(`[Fetch ${fetchId}] Getting Firebase services`);
       const { db } = await getFirebaseServices();
       if (!db) throw new Error('Firestore instance not available');
 
-      console.log('Fetching admin settings...');
+      console.log(`[Fetch ${fetchId}] Fetching from Firestore`);
       const settingsRef = doc(db, 'adminSettings', 'storiatsAdmins');
       const docSnap = await getDoc(settingsRef);
       
@@ -77,13 +82,18 @@ export const useStoriatsAdmins = () => {
         cachedSettings = settings;
         lastFetchTime = now;
         
+        console.log(`[Fetch ${fetchId}] Successfully fetched settings:`, {
+          adminCount: settings.adminEmails.length,
+          lastUpdated: settings.lastUpdated,
+          updatedBy: settings.updatedBy
+        });
+        
         setSettings(settings);
         setError(null);
-        console.log('Fetched admin settings:', settings);
         setLoading(false);
         return settings;
       } else {
-        console.log('No admin settings found, initializing with defaults');
+        console.log(`[Fetch ${fetchId}] No settings found, initializing defaults`);
         // Initialize with default settings if document doesn't exist
         const defaultSettings: AdminSettings = {
           adminEmails: [],
@@ -102,7 +112,7 @@ export const useStoriatsAdmins = () => {
         return defaultSettings;
       }
     } catch (error) {
-      console.error(`Error fetching admin settings (attempt ${retries + 1}/${MAX_RETRIES}):`, error);
+      console.error(`[Fetch ${fetchId}] Error fetching admin settings (attempt ${retries + 1}/${MAX_RETRIES}):`, error);
       retries++;
       
       if (retries === MAX_RETRIES) {
@@ -116,6 +126,7 @@ export const useStoriatsAdmins = () => {
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
       }
     } finally {
+      console.log(`[Fetch ${fetchId}] Fetch completed, resetting inProgress flag`);
       fetchInProgress.current = false;
     }
   }, [toast]);
