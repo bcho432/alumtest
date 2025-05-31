@@ -15,6 +15,7 @@ import { RoleBasedUI } from '@/components/common/RoleBasedUI';
 import { EditorRequestButton } from '@/components/common/EditorRequestButton';
 import type { University } from '@/types/university';
 import { toast } from 'react-hot-toast';
+import { Timestamp } from 'firebase/firestore';
 
 interface Memorial {
   id: string;
@@ -331,13 +332,29 @@ export default function ProfilePage() {
                         <div>
                           <dt className="text-sm font-medium text-gray-500">Date of Birth</dt>
                           <dd className="mt-1 text-sm text-gray-900">
-                            {(profile as MemorialProfile).basicInfo.dateOfBirth.toLocaleDateString()}
+                            {(() => {
+                              const dob = (profile as MemorialProfile).basicInfo.dateOfBirth;
+                              if (dob instanceof Timestamp) {
+                                return dob.toDate().toLocaleDateString();
+                              } else if (dob instanceof Date) {
+                                return dob.toLocaleDateString();
+                              }
+                              return '';
+                            })()}
                           </dd>
                         </div>
                         <div>
                           <dt className="text-sm font-medium text-gray-500">Date of Death</dt>
                           <dd className="mt-1 text-sm text-gray-900">
-                            {(profile as MemorialProfile).basicInfo.dateOfDeath.toLocaleDateString()}
+                            {(() => {
+                              const dod = (profile as MemorialProfile).basicInfo.dateOfDeath;
+                              if (dod instanceof Timestamp) {
+                                return dod.toDate().toLocaleDateString();
+                              } else if (dod instanceof Date) {
+                                return dod.toLocaleDateString();
+                              }
+                              return '';
+                            })()}
                           </dd>
                         </div>
                         <div>

@@ -33,7 +33,7 @@ interface CreateProfileParams {
     tags?: string[];
     categories?: string[];
     lastModifiedBy?: string;
-    lastModifiedAt?: string;
+    lastModifiedAt?: Timestamp;
     version?: number;
   };
 }

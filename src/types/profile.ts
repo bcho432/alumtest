@@ -128,7 +128,7 @@ export interface BaseProfile {
     tags: string[];
     categories: string[];
     lastModifiedBy: string;
-    lastModifiedAt: string | Timestamp;
+    lastModifiedAt: Timestamp;
     version: number;
   };
 }
@@ -200,7 +200,7 @@ export interface LocalDraft {
     tags: string[];
     categories: string[];
     lastModifiedBy: string;
-    lastModifiedAt: string;
+    lastModifiedAt: Timestamp;
     version: number;
   };
   lastSaved: string;

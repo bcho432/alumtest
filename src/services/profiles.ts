@@ -1,5 +1,5 @@
 import { getDb } from '@/lib/firebase';
-import { collection, doc, getDoc, getDocs, query, where, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where, addDoc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import type { Profile } from '@/types';
 import { ProfileService } from '@/types/services';
 
@@ -39,8 +39,8 @@ export const profilesService: ProfileService = {
     const profilesRef = collection(db, 'profiles');
     const docRef = await addDoc(profilesRef, {
       ...data,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
     });
     
     return { id: docRef.id, ...data } as Profile;
@@ -52,7 +52,7 @@ export const profilesService: ProfileService = {
     const profileRef = doc(db, 'profiles', profileId);
     await updateDoc(profileRef, {
       ...data,
-      updatedAt: new Date()
+      updatedAt: Timestamp.now()
     });
     
     return this.getProfile(profileId);
@@ -80,7 +80,7 @@ export const profilesService: ProfileService = {
         isDeceased: data.isDeceased || false,
         createdBy: data.createdBy,
         status: data.status || 'draft',
-        createdAt: data.createdAt?.toDate() || new Date(),
+        createdAt: data.createdAt || Timestamp.now(),
         universityId: data.universityId,
         basicInfo: data.basicInfo,
         lifeStory: data.lifeStory
@@ -102,7 +102,7 @@ export const profilesService: ProfileService = {
         isDeceased: data.isDeceased || false,
         createdBy: data.createdBy,
         status: data.status || 'draft',
-        createdAt: data.createdAt?.toDate() || new Date(),
+        createdAt: data.createdAt || Timestamp.now(),
         universityId: data.universityId,
         basicInfo: data.basicInfo,
         lifeStory: data.lifeStory

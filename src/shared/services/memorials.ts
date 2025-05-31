@@ -13,7 +13,8 @@ import {
   DocumentReference,
   QuerySnapshot,
   DocumentData,
-  CollectionReference
+  CollectionReference,
+  Timestamp
 } from 'firebase/firestore';
 import { Memorial, MemorialBasicInfo, MemorialLifeStory, MemorialPhoto } from '@/types/memorial';
 
@@ -127,14 +128,14 @@ export const createMemorial = async (data: Omit<Memorial, 'id' | 'createdAt' | '
     const memorialData: Memorial = {
       ...data,
       id: memorialRef.id,
-      createdAt: now,
-      updatedAt: now
+      createdAt: Timestamp.fromDate(now),
+      updatedAt: Timestamp.fromDate(now)
     };
 
     transaction.set(memorialRef, {
       ...memorialData,
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString()
+      createdAt: Timestamp.fromDate(now),
+      updatedAt: Timestamp.fromDate(now)
     });
 
     return memorialData;
@@ -187,7 +188,7 @@ export const updateMemorial = async (
       // Update the memorial
       await updateDoc(memorialRef, {
         ...updates,
-        updatedAt: new Date().toISOString(),
+        updatedAt: Timestamp.fromDate(new Date()),
       });
     } catch (error) {
       console.error('Error updating memorial:', error);
@@ -231,8 +232,14 @@ export const getMemorial = async (memorialId: string): Promise<Memorial | null> 
       return {
         ...data,
         id: memorialDoc.id,
-        createdAt,
-        updatedAt
+        createdAt: data.createdAt ?? Timestamp.now(),
+        updatedAt: data.updatedAt ?? Timestamp.now(),
+        universityId: data.universityId ?? '',
+        status: data.status ?? 'draft',
+        basicInfo: data.basicInfo ?? {},
+        lastModifiedAt: data.lastModifiedAt ?? Timestamp.now(),
+        lastModifiedBy: data.lastModifiedBy ?? '',
+        version: data.version ?? 1
       } as Memorial;
     } catch (error) {
       console.error('Error getting memorial:', error);
@@ -279,8 +286,14 @@ export const getMemorialsByUniversity = async (universityId: string): Promise<Me
         memorials.push({
           ...data,
           id: doc.id,
-          createdAt,
-          updatedAt
+          createdAt: data.createdAt ?? Timestamp.now(),
+          updatedAt: data.updatedAt ?? Timestamp.now(),
+          universityId: data.universityId ?? '',
+          status: data.status ?? 'draft',
+          basicInfo: data.basicInfo ?? {},
+          lastModifiedAt: data.lastModifiedAt ?? Timestamp.now(),
+          lastModifiedBy: data.lastModifiedBy ?? '',
+          version: data.version ?? 1
         } as Memorial);
       });
 
@@ -306,9 +319,15 @@ export const getMemorialsByCreator = async (creatorId: string): Promise<Memorial
       return querySnapshot.docs.map(doc => ({
         ...doc.data(),
         id: doc.id,
-        createdAt: new Date(doc.data().createdAt),
-        updatedAt: new Date(doc.data().updatedAt),
-      })) as Memorial[];
+        createdAt: doc.data().createdAt ?? Timestamp.now(),
+        updatedAt: doc.data().updatedAt ?? Timestamp.now(),
+        universityId: doc.data().universityId ?? '',
+        status: doc.data().status ?? 'draft',
+        basicInfo: doc.data().basicInfo ?? {},
+        lastModifiedAt: doc.data().lastModifiedAt ?? Timestamp.now(),
+        lastModifiedBy: doc.data().lastModifiedBy ?? '',
+        version: doc.data().version ?? 1
+      }) as Memorial);
     } catch (error) {
       console.error('Error getting memorials by creator:', error);
       throw error;
@@ -342,7 +361,7 @@ export const updateMemorialLifeStory = async (
 
         transaction.update(memorialRef, {
           lifeStory,
-          updatedAt: new Date().toISOString()
+          updatedAt: Timestamp.fromDate(new Date()),
         });
       });
     } catch (error) {
@@ -372,7 +391,7 @@ export const updateMemorialPhotos = async (memorialId: string, photos: MemorialP
 
     await updateDoc(memorialRef, {
       photos,
-      updatedAt: serverTimestamp(),
+      updatedAt: Timestamp.fromDate(new Date()),
     });
   } catch (error) {
     console.error('Error updating memorial photos:', error);
@@ -423,8 +442,14 @@ export const getUniversityMemorials = async (universityId: string): Promise<Memo
       memorials.push({
         ...data,
         id: doc.id,
-        createdAt,
-        updatedAt
+        createdAt: data.createdAt ?? Timestamp.now(),
+        updatedAt: data.updatedAt ?? Timestamp.now(),
+        universityId: data.universityId ?? '',
+        status: data.status ?? 'draft',
+        basicInfo: data.basicInfo ?? {},
+        lastModifiedAt: data.lastModifiedAt ?? Timestamp.now(),
+        lastModifiedBy: data.lastModifiedBy ?? '',
+        version: data.version ?? 1
       } as Memorial);
     });
     
@@ -453,7 +478,7 @@ export const publishMemorial = async (memorialId: string): Promise<void> => {
 
     await updateDoc(memorialRef, {
       status: 'published',
-      updatedAt: serverTimestamp(),
+      updatedAt: Timestamp.fromDate(new Date()),
     });
   } catch (error) {
     console.error('Error publishing memorial:', error);
@@ -479,7 +504,7 @@ export const approveMemorial = async (memorialId: string): Promise<void> => {
 
     await updateDoc(memorialRef, {
       universityApproved: true,
-      updatedAt: serverTimestamp(),
+      updatedAt: Timestamp.fromDate(new Date()),
     });
   } catch (error) {
     console.error('Error approving memorial:', error);

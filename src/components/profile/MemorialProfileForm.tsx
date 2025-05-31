@@ -8,17 +8,17 @@ import { MemorialProfile, TimelineEvent } from '@/types/profile';
 import { toast } from 'react-hot-toast';
 import { Badge } from '@/components/ui/Badge';
 import { ImageUpload } from '@/components/ui/ImageUpload';
-import { TimelineBuilder } from '@/components/timeline/TimelineBuilder';
-import { MediaGallery } from '@/components/media/MediaGallery';
 import { TabsRoot, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { Switch } from '@/components/ui/Switch';
 import { Card } from '@/components/ui/Card';
 import { Dialog } from '@/components/ui/Dialog';
 import debounce from 'lodash/debounce';
+import { Timestamp } from 'firebase/firestore';
+import { MemorialProfileFormData } from '@/app/[org]/memorials/new/page';
 
 interface MemorialProfileFormProps {
   profile?: MemorialProfile;
-  onSubmit: (data: Partial<MemorialProfile>) => Promise<void>;
+  onSubmit: (data: MemorialProfileFormData) => Promise<void>;
   onCancel: () => void;
   className?: string;
 }
@@ -40,7 +40,14 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
   onCancel,
   className
 }) => {
-  const [formData, setFormData] = useState<Partial<MemorialProfile>>(profile || {
+  const [formData, setFormData] = useState<MemorialProfileFormData>({
+    id: '',
+    type: 'memorial',
+    universityId: '',
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+    createdBy: '',
+    updatedBy: '',
     name: '',
     description: '',
     imageUrl: '',
@@ -62,16 +69,8 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
       tags: [],
       categories: [],
       lastModifiedBy: '',
-      lastModifiedAt: new Date().toISOString(),
+      lastModifiedAt: Timestamp.fromDate(new Date()),
       version: 1
-    },
-    education: [],
-    experience: [],
-    achievements: [],
-    timeline: [],
-    media: {
-      photos: [],
-      videos: []
     }
   });
 
@@ -86,13 +85,13 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
 
   // Debounced auto-save
   const debouncedSave = useCallback(
-    debounce(async (data: Partial<MemorialProfile>) => {
+    debounce(async (data: MemorialProfileFormData) => {
       try {
         const metadata = {
           tags: data.metadata?.tags || [],
           categories: data.metadata?.categories || [],
           lastModifiedBy: data.metadata?.lastModifiedBy || '',
-          lastModifiedAt: new Date().toISOString(),
+          lastModifiedAt: Timestamp.fromDate(new Date()),
           version: (data.metadata?.version || 0) + 1
         };
 
@@ -111,7 +110,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
   );
 
   // Validate form data
-  const validateForm = (data: Partial<MemorialProfile>): FormErrors => {
+  const validateForm = (data: MemorialProfileFormData): FormErrors => {
     const newErrors: FormErrors = {};
     
     if (!data.name?.trim()) {
@@ -125,8 +124,8 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
     }
 
     if (data.basicInfo?.dateOfBirth && data.basicInfo?.dateOfDeath) {
-      const birthDate = new Date(data.basicInfo.dateOfBirth);
-      const deathDate = new Date(data.basicInfo.dateOfDeath);
+      const birthDate = data.basicInfo.dateOfBirth instanceof Timestamp ? data.basicInfo.dateOfBirth.toDate() : new Date(data.basicInfo.dateOfBirth);
+      const deathDate = data.basicInfo.dateOfDeath instanceof Timestamp ? data.basicInfo.dateOfDeath.toDate() : new Date(data.basicInfo.dateOfDeath);
       
       if (deathDate < birthDate) {
         newErrors.dateOfDeath = 'Death date must be after birth date';
@@ -145,7 +144,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
   };
 
   // Update form data with validation
-  const updateFormData = (updates: Partial<MemorialProfile>) => {
+  const updateFormData = (updates: Partial<MemorialProfileFormData>) => {
     const newData = { ...formData, ...updates };
     const newErrors = validateForm(newData);
     setErrors(newErrors);
@@ -191,7 +190,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
         tags: formData.metadata?.tags || [],
         categories: formData.metadata?.categories || [],
         lastModifiedBy: formData.metadata?.lastModifiedBy || '',
-        lastModifiedAt: new Date().toISOString(),
+        lastModifiedAt: Timestamp.fromDate(new Date()),
         version: (formData.metadata?.version || 0) + 1
       };
 
@@ -217,7 +216,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
         tags: formData.metadata?.tags || [],
         categories: formData.metadata?.categories || [],
         lastModifiedBy: formData.metadata?.lastModifiedBy || '',
-        lastModifiedAt: new Date().toISOString(),
+        lastModifiedAt: Timestamp.fromDate(new Date()),
         version: (formData.metadata?.version || 0) + 1
       };
 
@@ -248,7 +247,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
         tags: [...(prev.metadata?.tags || []), newTag.trim()],
         categories: prev.metadata?.categories || [],
         lastModifiedBy: prev.metadata?.lastModifiedBy || '',
-        lastModifiedAt: new Date().toISOString(),
+        lastModifiedAt: Timestamp.fromDate(new Date()),
         version: (prev.metadata?.version || 0) + 1
       }
     }));
@@ -262,7 +261,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
         tags: (prev.metadata?.tags || []).filter(tag => tag !== tagToRemove),
         categories: prev.metadata?.categories || [],
         lastModifiedBy: prev.metadata?.lastModifiedBy || '',
-        lastModifiedAt: new Date().toISOString(),
+        lastModifiedAt: Timestamp.fromDate(new Date()),
         version: (prev.metadata?.version || 0) + 1
       }
     }));
@@ -272,20 +271,6 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
     setFormData(prev => ({
       ...prev,
       imageUrl: url
-    }));
-  };
-
-  const handleTimelineChange = async (events: TimelineEvent[]): Promise<void> => {
-    setFormData(prev => ({
-      ...prev,
-      timeline: events
-    }));
-  };
-
-  const handleMediaChange = (media: { photos: any[], videos: any[] }) => {
-    setFormData(prev => ({
-      ...prev,
-      media
     }));
   };
 
@@ -408,7 +393,15 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
                   <Input
                     id="dateOfBirth"
                     type="date"
-                    value={formData.basicInfo?.dateOfBirth.toISOString().split('T')[0]}
+                    value={
+                      formData.basicInfo?.dateOfBirth
+                        ? (formData.basicInfo.dateOfBirth instanceof Date
+                            ? formData.basicInfo.dateOfBirth.toISOString().split('T')[0]
+                            : formData.basicInfo.dateOfBirth instanceof Timestamp
+                              ? formData.basicInfo.dateOfBirth.toDate().toISOString().split('T')[0]
+                              : '')
+                        : ''
+                    }
                     onChange={(e) => updateFormData({
                       basicInfo: {
                         ...formData.basicInfo!,
@@ -429,7 +422,15 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
                   <Input
                     id="dateOfDeath"
                     type="date"
-                    value={formData.basicInfo?.dateOfDeath.toISOString().split('T')[0]}
+                    value={
+                      formData.basicInfo?.dateOfDeath
+                        ? (formData.basicInfo.dateOfDeath instanceof Date
+                            ? formData.basicInfo.dateOfDeath.toISOString().split('T')[0]
+                            : formData.basicInfo.dateOfDeath instanceof Timestamp
+                              ? formData.basicInfo.dateOfDeath.toDate().toISOString().split('T')[0]
+                              : '')
+                        : ''
+                    }
                     onChange={(e) => updateFormData({
                       basicInfo: {
                         ...formData.basicInfo!,
@@ -550,11 +551,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
             <Card className="p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Life Timeline</h3>
               <div className="mt-4">
-                <TimelineBuilder
-                  existingEvents={formData.timeline}
-                  onUpdate={handleTimelineChange}
-                  isSubmitting={loading}
-                />
+                {/* Timeline content removed */}
               </div>
             </Card>
           </TabsContent>
@@ -563,10 +560,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
             <Card className="p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Media Gallery</h3>
               <div className="mt-4">
-                <MediaGallery
-                  profileId={formData.id || ''}
-                  className="w-full"
-                />
+                {/* Media gallery content removed */}
               </div>
             </Card>
           </TabsContent>

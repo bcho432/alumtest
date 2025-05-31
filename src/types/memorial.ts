@@ -1,3 +1,5 @@
+import { Timestamp } from 'firebase/firestore';
+
 export interface MemorialBasicInfo {
   name: string;
   dateOfBirth?: string;
@@ -29,11 +31,14 @@ export interface Memorial {
   basicInfo: MemorialBasicInfo;
   lifeStory?: MemorialLifeStory;
   photos?: MemorialPhoto[];
-  createdAt: Date | string;
-  updatedAt: Date | string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
   creatorId?: string;
   collaboratorIds?: string[];
   universityApproved?: boolean;
+  lastModifiedAt: Timestamp;
+  lastModifiedBy: string;
+  version: number;
 }
 
 export interface MemorialPreview {
@@ -41,9 +46,10 @@ export interface MemorialPreview {
   title: string;
   description: string;
   coverImage: string;
-  createdAt: Date | string;
+  createdAt: Timestamp;
   createdBy: string;
   universityId: string;
+  lastModifiedAt: Timestamp;
 }
 
 export function memorialToPreview(memorial: Memorial): MemorialPreview {
@@ -54,6 +60,7 @@ export function memorialToPreview(memorial: Memorial): MemorialPreview {
     coverImage: memorial.photos?.[0]?.url || '',
     createdAt: memorial.createdAt,
     createdBy: memorial.creatorId || '',
-    universityId: memorial.universityId
+    universityId: memorial.universityId,
+    lastModifiedAt: memorial.lastModifiedAt,
   };
 } 

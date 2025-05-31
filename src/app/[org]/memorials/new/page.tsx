@@ -7,6 +7,22 @@ import { MemorialProfileForm } from '@/components/profile/MemorialProfileForm';
 import { useCreateProfile } from '@/hooks/useCreateProfile';
 import { toast } from 'react-hot-toast';
 import { MemorialProfile } from '@/types/profile';
+import { Timestamp } from 'firebase/firestore';
+
+export type MemorialProfileFormData = Omit<MemorialProfile, 'basicInfo' | 'lifeStory'> & {
+  basicInfo: {
+    dateOfBirth: Date | Timestamp;
+    dateOfDeath: Date | Timestamp;
+    biography: string;
+    photo: string;
+    birthLocation: string;
+    deathLocation: string;
+  };
+  lifeStory?: {
+    content: string;
+    updatedAt: Date | Timestamp;
+  };
+};
 
 export default function NewMemorialPage() {
   const { org } = useParams();
@@ -14,7 +30,7 @@ export default function NewMemorialPage() {
   const { user } = useAuth();
   const { createProfile } = useCreateProfile();
 
-  const handleSubmit = async (data: Partial<MemorialProfile>) => {
+  const handleSubmit = async (data: MemorialProfileFormData) => {
     try {
       console.log('Creating new memorial profile:', data);
       const profileId = await createProfile({
@@ -26,24 +42,34 @@ export default function NewMemorialPage() {
         name: data.name || '',
         description: data.description || '',
         imageUrl: data.imageUrl || '',
-        basicInfo: data.basicInfo || {
-          dateOfBirth: new Date(),
-          dateOfDeath: new Date(),
-          biography: '',
-          photo: '',
-          birthLocation: '',
-          deathLocation: ''
+        basicInfo: {
+          dateOfBirth: data.basicInfo.dateOfBirth instanceof Timestamp ? data.basicInfo.dateOfBirth : Timestamp.fromDate(new Date(data.basicInfo.dateOfBirth)),
+          dateOfDeath: data.basicInfo.dateOfDeath instanceof Timestamp ? data.basicInfo.dateOfDeath : Timestamp.fromDate(new Date(data.basicInfo.dateOfDeath)),
+          biography: data.basicInfo.biography,
+          photo: data.basicInfo.photo,
+          birthLocation: data.basicInfo.birthLocation,
+          deathLocation: data.basicInfo.deathLocation,
+        } as {
+          dateOfBirth?: Date | Timestamp;
+          dateOfDeath?: Date | Timestamp;
+          biography?: string;
+          photo?: string;
+          birthLocation?: string;
+          deathLocation?: string;
         },
-        lifeStory: data.lifeStory || {
-          content: '',
-          updatedAt: new Date()
-        },
+        lifeStory: data.lifeStory ? {
+          content: data.lifeStory.content,
+          updatedAt: data.lifeStory.updatedAt instanceof Timestamp ? data.lifeStory.updatedAt : Timestamp.fromDate(new Date(data.lifeStory.updatedAt)),
+        } as {
+          content?: string;
+          updatedAt?: Date | Timestamp;
+        } : undefined,
         isPublic: false,
         metadata: {
           tags: [],
           categories: [],
           lastModifiedBy: user?.uid || '',
-          lastModifiedAt: new Date().toISOString(),
+          lastModifiedAt: Timestamp.fromDate(new Date()),
           version: 1
         }
       });

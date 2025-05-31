@@ -11,6 +11,7 @@ import { Profile, PersonalProfile, MemorialProfile } from '@/types/profile';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
+import { Timestamp } from 'firebase/firestore';
 
 interface ProfileListProps {
   profiles: Profile[];
@@ -41,13 +42,14 @@ export const ProfileList: React.FC<ProfileListProps> = ({
       return matchesSearch && matchesFilter;
     })
     .sort((a, b) => {
+      const getDate = (d: any) => d instanceof Timestamp ? d.toDate() : new Date(d);
       switch (sortBy) {
         case 'name':
           return a.name.localeCompare(b.name);
         case 'createdAt':
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          return getDate(b.createdAt).getTime() - getDate(a.createdAt).getTime();
         case 'updatedAt':
-          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+          return getDate(b.updatedAt).getTime() - getDate(a.updatedAt).getTime();
         default:
           return 0;
       }

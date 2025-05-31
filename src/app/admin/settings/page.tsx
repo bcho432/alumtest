@@ -12,6 +12,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
 import { validateEmail } from '@/lib/validation';
+import { useRouter } from 'next/navigation';
 
 export default function StoriatsAdminSettingsPage() {
   const { user } = useAuth();
@@ -24,6 +25,7 @@ export default function StoriatsAdminSettingsPage() {
     isStoriatsAdmin,
     refreshSettings
   } = useStoriatsAdmins();
+  const router = useRouter();
 
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -32,55 +34,49 @@ export default function StoriatsAdminSettingsPage() {
   const [isCheckingAccess, setIsCheckingAccess] = useState(true);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
+  // Check admin access
   useEffect(() => {
     const checkAccess = async () => {
-      console.log('[Admin Check] Starting access check, user:', user?.email);
-      
       if (!user?.email) {
-        console.log('[Admin Check] No user email, denying access');
-        setIsCheckingAccess(false);
-        setIsAdmin(false);
+        console.log('[Admin Check] No user email, redirecting to landing');
+        router.push('/');
         return;
       }
 
-      try {
-        console.log('[Admin Check] Checking admin status for:', user.email);
-        const adminStatus = isStoriatsAdmin(user.email);
-        console.log('[Admin Check] Admin status result:', {
-          email: user.email,
-          isAdmin: adminStatus,
-          settings: settings ? {
-            adminCount: settings.adminEmails.length,
-            lastUpdated: settings.lastUpdated
-          } : 'no settings'
-        });
-        
-        setIsAdmin(adminStatus);
-        if (adminStatus) {
-          console.log('[Admin Check] User is admin, refreshing settings');
-          await refreshSettings();
-        }
-      } catch (error) {
-        console.error('[Admin Check] Error checking admin access:', error);
-        toast('Error checking admin access', 'error');
-        setIsAdmin(false);
-      } finally {
-        setIsCheckingAccess(false);
+      console.log('[Admin Check] Starting access check, user:', user.email);
+      const hasAccess = isStoriatsAdmin(user.email.toLowerCase());
+      console.log('[Admin Check] Admin status result:', { email: user.email, hasAccess });
+
+      if (!hasAccess) {
+        console.log('[Admin Check] Access denied, redirecting to landing');
+        router.push('/');
       }
     };
 
     checkAccess();
-  }, [user?.email, isStoriatsAdmin, refreshSettings, toast, settings]);
+  }, [user?.email, isStoriatsAdmin, router]);
 
-  // Add effect to track auth state changes
+  // Track auth state changes
   useEffect(() => {
     console.log('[Auth State] Changed:', {
       userId: user?.uid,
       email: user?.email,
-      isCheckingAccess,
-      isAdmin
+      isAdmin: isStoriatsAdmin(user?.email?.toLowerCase() || '')
     });
-  }, [user, isCheckingAccess, isAdmin]);
+  }, [user, isStoriatsAdmin]);
+
+  // Fetch settings only once on mount
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        await refreshSettings();
+      } catch (error) {
+        console.error('[Settings] Error fetching settings:', error);
+      }
+    };
+
+    fetchSettings();
+  }, []); // Empty dependency array to run only once
 
   const handleAddAdmin = async () => {
     if (!user?.email) return;
@@ -180,14 +176,14 @@ export default function StoriatsAdminSettingsPage() {
                 <p className="mt-1 text-gray-600">Manage Storiats admin access</p>
               </div>
               <Button
-                variant="outline"
                 onClick={() => refreshSettings()}
                 disabled={loading}
+                className="flex items-center gap-2"
               >
                 {loading ? (
-                  <Spinner className="w-4 h-4 mr-2" />
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  <Icon name="arrow-path" className="w-4 h-4 mr-2" />
+                  <Icon name="sync" />
                 )}
                 Refresh
               </Button>

@@ -246,7 +246,7 @@ export default function UniversityPage() {
                     {memorial.description}
                   </p>
                   <p className="text-xs text-gray-500">
-                    Created {new Date(memorial.createdAt).toLocaleDateString()}
+                    Created {memorial.createdAt.toDate().toLocaleDateString()}
                   </p>
                 </div>
               </Link>

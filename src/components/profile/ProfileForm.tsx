@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Profile, PersonalProfile, MemorialProfile } from '@/types/profile';
 import { toast } from 'react-hot-toast';
 import { Badge } from '@/components/ui/Badge';
+import { Timestamp } from 'firebase/firestore';
 
 interface ProfileFormProps {
   profile?: Profile;
@@ -34,17 +35,30 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
       type: 'personal',
       status: 'draft',
       isPublic: false,
-      createdAt: '',
-      updatedAt: '',
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
       createdBy: '',
       updatedBy: '',
       metadata: {
         tags: [],
         categories: [],
         lastModifiedBy: '',
-        lastModifiedAt: '',
+        lastModifiedAt: Timestamp.now(),
         version: 0
-      }
+      },
+      bio: '',
+      photoURL: '',
+      location: '',
+      department: '',
+      graduationYear: '',
+      contact: {
+        email: '',
+        phone: '',
+        website: ''
+      },
+      education: [],
+      experience: [],
+      achievements: []
     } as PersonalProfile;
   });
 
@@ -147,13 +161,19 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
                 setFormData({
                   ...formData,
                   type: 'personal',
-                  email: '',
                   bio: '',
                   location: '',
                   photoURL: '',
-                  coverImage: '',
                   department: '',
-                  graduationYear: ''
+                  graduationYear: '',
+                  contact: {
+                    email: '',
+                    phone: '',
+                    website: ''
+                  },
+                  education: [],
+                  experience: [],
+                  achievements: []
                 } as PersonalProfile);
               }
             }}
@@ -205,8 +225,14 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
               <Input
                 id="email"
                 type="email"
-                value={(formData as PersonalProfile).email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                value={(formData as PersonalProfile).contact.email}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  contact: {
+                    ...(formData as PersonalProfile).contact,
+                    email: e.target.value
+                  }
+                })}
                 className="mt-1"
               />
             </div>

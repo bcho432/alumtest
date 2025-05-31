@@ -8,6 +8,7 @@ import { toast } from 'react-hot-toast';
 import { Profile, PersonalProfile, MemorialProfile } from '@/types/profile';
 import { getFirebaseServices } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
 
 export default function EditProfilePage() {
   const { id } = useParams();
@@ -62,7 +63,7 @@ export default function EditProfilePage() {
       const updateData: Partial<Profile> = {
         name: formData.name,
         updatedBy: user?.uid,
-        updatedAt: new Date().toISOString()
+        updatedAt: Timestamp.fromDate(new Date()),
       };
 
       if (profile?.type === 'personal') {

@@ -58,8 +58,8 @@ export const generateProfileDiffs = (
 
   // Generate timeline diff
   const timelineDiff = generateDiff(
-    (publishedProfile.type === 'memorial' && publishedProfile.timeline ? publishedProfile.timeline : []).map(formatTimelineEvent).join('\n'),
-    (draftProfile.type === 'memorial' && draftProfile.timeline ? draftProfile.timeline : []).map(formatTimelineEvent).join('\n')
+    (publishedProfile.type === 'memorial' && (publishedProfile as any).timeline ? (publishedProfile as any).timeline : []).map(formatTimelineEvent).join('\n'),
+    (draftProfile.type === 'memorial' && (draftProfile as any).timeline ? (draftProfile as any).timeline : []).map(formatTimelineEvent).join('\n')
   );
 
   // Generate story answers diff

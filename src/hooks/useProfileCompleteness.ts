@@ -37,8 +37,8 @@ export const useProfileCompleteness = (profileId: string) => {
 
         // Timeline entries
         required += 2; // education, work
-        if (profile.education?.length) completed++;
-        if (profile.experience?.length) completed++;
+        if (profile.type === 'personal' && profile.education?.length) completed++;
+        if (profile.type === 'personal' && profile.experience?.length) completed++;
 
         setCompleteness({ required, completed });
       } catch (error) {

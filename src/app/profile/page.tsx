@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/Label';
 import { toast } from 'react-hot-toast';
 import { getFirebaseServices } from '@/lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
 
 export default function ProfilePage() {
   const { user, loading, signOut } = useAuth();
@@ -37,10 +38,13 @@ export default function ProfilePage() {
       const { db } = await getFirebaseServices();
       if (!db) throw new Error('Firestore instance not available');
 
-      await updateDoc(doc(db, 'users', user.uid), {
+      const updateData = {
         displayName: displayName,
-        updatedAt: new Date().toISOString()
-      });
+        updatedBy: user?.uid,
+        updatedAt: Timestamp.fromDate(new Date()),
+      };
+
+      await updateDoc(doc(db, 'users', user.uid), updateData);
 
       toast.success('Profile updated successfully');
       setIsEditing(false);

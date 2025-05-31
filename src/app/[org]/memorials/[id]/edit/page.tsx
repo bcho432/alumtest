@@ -9,6 +9,7 @@ import { toast } from 'react-hot-toast';
 import { MemorialProfile } from '@/types/profile';
 import { getFirebaseServices } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
 
 export default function EditMemorialPage() {
   const { org, id } = useParams();
@@ -50,7 +51,7 @@ export default function EditMemorialPage() {
       const updateData = {
         ...data,
         updatedBy: user?.uid,
-        updatedAt: new Date().toISOString()
+        updatedAt: Timestamp.fromDate(new Date()),
       };
 
       await updateDoc(memorialRef, updateData);

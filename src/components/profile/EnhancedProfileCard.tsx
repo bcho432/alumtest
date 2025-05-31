@@ -8,6 +8,7 @@ import { Profile } from '@/types/profile';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { useUserRoles } from '@/hooks/useUserRoles';
+import { Timestamp } from 'firebase/firestore';
 
 interface EnhancedProfileCardProps {
   profile: Profile;
@@ -90,27 +91,39 @@ export const EnhancedProfileCard: React.FC<EnhancedProfileCardProps> = ({
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-4">
-            {profile.photoURL ? (
+            {profile.type === 'personal' && (profile as any).photoURL ? (
               <img
-                src={profile.photoURL}
+                src={(profile as any).photoURL}
+                alt={profile.name}
+                className="w-16 h-16 rounded-full object-cover"
+              />
+            ) : profile.type === 'memorial' && (profile as any).imageUrl ? (
+              <img
+                src={(profile as any).imageUrl}
                 alt={profile.name}
                 className="w-16 h-16 rounded-full object-cover"
               />
             ) : (
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white">
-                <span className="text-2xl font-semibold">
-                  {profile.name.charAt(0)}
-                </span>
+              <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center">
+                <Icon name="user" className="w-8 h-8 text-gray-400" />
               </div>
             )}
             <div>
               <h2 className="text-xl font-semibold text-gray-900">{profile.name}</h2>
-              {profile.type === 'memorial' && (
-                <p className="text-sm text-gray-600">
-                  {profile.basicInfo?.dateOfBirth ? new Date(profile.basicInfo.dateOfBirth).toLocaleDateString() : ''}
-                  {' - '}
-                  {profile.basicInfo?.dateOfDeath ? new Date(profile.basicInfo.dateOfDeath).toLocaleDateString() : ''}
-                </p>
+              {profile.type === 'memorial' && (profile as any).basicInfo && (
+                <div className="text-sm text-gray-500">
+                  {(() => {
+                    const dob = (profile as any).basicInfo.dateOfBirth;
+                    const dod = (profile as any).basicInfo.dateOfDeath;
+                    const formatDate = (date: Date | Timestamp) => {
+                      if (date instanceof Timestamp) {
+                        return date.toDate().toLocaleDateString();
+                      }
+                      return date.toLocaleDateString();
+                    };
+                    return `${formatDate(dob)} - ${formatDate(dod)}`;
+                  })()}
+                </div>
               )}
             </div>
           </div>
