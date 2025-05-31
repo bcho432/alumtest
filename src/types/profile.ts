@@ -646,8 +646,8 @@ export interface ProfileFormData {
 
 export interface MemorialProfileFormData extends Omit<MemorialProfile, 'basicInfo' | 'lifeStory'> {
   basicInfo: {
-    dateOfBirth: Date | Timestamp;
-    dateOfDeath: Date | Timestamp;
+    dateOfBirth: Date | Timestamp | null;
+    dateOfDeath: Date | Timestamp | null;
     biography: string;
     photo: string;
     birthLocation: string;

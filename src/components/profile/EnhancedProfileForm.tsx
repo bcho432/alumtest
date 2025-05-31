@@ -34,12 +34,12 @@ interface ProfileFormData {
   description: string;
   imageUrl: string;
   basicInfo: {
-    dateOfBirth: Date | Timestamp;
-    dateOfDeath?: Date | Timestamp;
+    dateOfBirth: Date | Timestamp | null;
+    dateOfDeath: Date | Timestamp | null;
     biography: string;
     photo: string;
-    birthLocation?: string;
-    deathLocation?: string;
+    birthLocation: string;
+    deathLocation: string;
   };
   lifeStory: {
     content: string;
@@ -51,7 +51,7 @@ interface ProfileFormData {
     tags: string[];
     categories: string[];
     lastModifiedBy: string;
-    lastModifiedAt: string;
+    lastModifiedAt: Timestamp;
     version: number;
   };
 }
@@ -73,6 +73,55 @@ type TabId = typeof tabs[number]['id'];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
+// Add type guard functions at the top of the file
+const isTimestamp = (value: unknown): value is Timestamp => {
+  return value instanceof Timestamp;
+};
+
+const isDate = (value: unknown): value is Date => {
+  return value instanceof Date;
+};
+
+const toDate = (value: Date | Timestamp | null): Date | null => {
+  if (!value) return null;
+  if (isTimestamp(value)) return value.toDate();
+  if (isDate(value)) return value;
+  return null;
+};
+
+const validateDates = (birthDate: Date | Timestamp | null, deathDate: Date | Timestamp | null): string[] => {
+  const errors: string[] = [];
+  const now = new Date();
+  
+  if (birthDate) {
+    const birth = birthDate instanceof Timestamp ? birthDate.toDate() : birthDate;
+    if (birth > now) {
+      errors.push('Date of birth must be in the past');
+    }
+    if (deathDate) {
+      const death = deathDate instanceof Timestamp ? deathDate.toDate() : deathDate;
+      if (birth > death) {
+        errors.push('Date of birth must be before date of death');
+      }
+    }
+  }
+  
+  if (deathDate) {
+    const death = deathDate instanceof Timestamp ? deathDate.toDate() : deathDate;
+    if (death > now) {
+      errors.push('Date of death must be in the past');
+    }
+    if (birthDate) {
+      const birth = birthDate instanceof Timestamp ? birthDate.toDate() : birthDate;
+      if (death < birth) {
+        errors.push('Date of death must be after date of birth');
+      }
+    }
+  }
+  
+  return errors;
+};
+
 export function EnhancedProfileForm({ universityId, profileId, onSuccess }: EnhancedProfileFormProps) {
   const { user } = useAuth();
   const { isAdmin, isEditor } = usePermissions();
@@ -87,9 +136,12 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
     description: '',
     imageUrl: '',
     basicInfo: {
-      dateOfBirth: new Date(),
+      dateOfBirth: null,
+      dateOfDeath: null,
       biography: '',
       photo: '',
+      birthLocation: '',
+      deathLocation: '',
     },
     lifeStory: {
       content: '',
@@ -101,7 +153,7 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
       tags: [],
       categories: [],
       lastModifiedBy: '',
-      lastModifiedAt: new Date().toISOString(),
+      lastModifiedAt: Timestamp.fromDate(new Date()),
       version: 1,
     },
   });
@@ -172,8 +224,21 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
     }
   };
 
-  const handleInputChange = (field: keyof ProfileFormData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => {
+      const newData = { ...prev };
+      if (field === 'basicInfo') {
+        newData.basicInfo = {
+          ...prev.basicInfo,
+          ...value,
+          dateOfBirth: value.dateOfBirth instanceof Date ? value.dateOfBirth : null,
+          dateOfDeath: value.dateOfDeath instanceof Date ? value.dateOfDeath : null
+        };
+      } else {
+        (newData as any)[field] = value;
+      }
+      return newData;
+    });
   };
 
   const handleFileUpload = async (file: File) => {
@@ -254,85 +319,38 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
     }
   };
 
-  const validateDateField = (field: 'dateOfBirth' | 'dateOfDeath', value: Date | Timestamp | undefined) => {
-    const errors: string[] = [];
+  const handleDateChange = (field: 'dateOfBirth' | 'dateOfDeath', value: Date | undefined) => {
+    const dateValue = value || null;
+    const newBasicInfo = {
+      ...formData.basicInfo,
+      [field]: dateValue
+    };
     
-    if (field === 'dateOfBirth' && value) {
-      const dateValue = value instanceof Timestamp ? value.toDate() : value;
-      if (dateValue > new Date()) {
-        errors.push('Date of birth must be in the past');
-      }
-      if (formData.basicInfo.dateOfDeath) {
-        const deathDate = formData.basicInfo.dateOfDeath instanceof Timestamp 
-          ? formData.basicInfo.dateOfDeath.toDate() 
-          : formData.basicInfo.dateOfDeath;
-        if (dateValue > deathDate) {
-          errors.push('Date of birth must be before date of death');
-        }
-      }
-    }
+    // Validate dates
+    const errors = validateDates(
+      field === 'dateOfBirth' ? dateValue : formData.basicInfo.dateOfBirth,
+      field === 'dateOfDeath' ? dateValue : formData.basicInfo.dateOfDeath
+    );
     
-    if (field === 'dateOfDeath' && value) {
-      const dateValue = value instanceof Timestamp ? value.toDate() : value;
-      if (dateValue > new Date()) {
-        errors.push('Date of death must be in the past');
-      }
-      if (formData.basicInfo.dateOfBirth) {
-        const birthDate = formData.basicInfo.dateOfBirth instanceof Timestamp 
-          ? formData.basicInfo.dateOfBirth.toDate() 
-          : formData.basicInfo.dateOfBirth;
-        if (dateValue < birthDate) {
-          errors.push('Date of death must be after date of birth');
-        }
-      }
-    }
-
+    // Update form data and errors
+    handleInputChange('basicInfo', newBasicInfo);
     setFieldErrors(prev => ({
       ...prev,
-      [field]: errors.length > 0 ? errors[0] : undefined
+      [field]: errors.find(error => error.includes(field === 'dateOfBirth' ? 'birth' : 'death'))
     }));
-
-    return errors.length === 0;
   };
 
   const validateForm = (): string[] => {
     const errors: string[] = [];
-
-    // Basic validation
-    if (!formData.name.trim()) {
+    
+    // Validate required fields
+    if (!formData.name?.trim()) {
       errors.push('Name is required');
     }
-
-    if (!formData.basicInfo.biography.trim()) {
-      errors.push('Biography is required');
-    }
-
-    if (!formData.basicInfo.photo) {
-      errors.push('Profile photo is required');
-    }
-
-    // Date validation
-    if (!validateDateField('dateOfBirth', formData.basicInfo.dateOfBirth)) {
-      errors.push('Date of birth must be in the past');
-    }
-
-    if (!validateDateField('dateOfDeath', formData.basicInfo.dateOfDeath)) {
-      errors.push('Date of death must be in the past');
-    }
-
-    // Memorial-specific validation
-    if (formData.type === 'memorial') {
-      if (!formData.basicInfo.dateOfDeath) {
-        errors.push('Date of death is required for memorial profiles');
-      }
-      if (!formData.basicInfo.birthLocation?.trim()) {
-        errors.push('Birth location is required for memorial profiles');
-      }
-      if (!formData.basicInfo.deathLocation?.trim()) {
-        errors.push('Death location is required for memorial profiles');
-      }
-    }
-
+    
+    // Validate dates
+    errors.push(...validateDates(formData.basicInfo.dateOfBirth, formData.basicInfo.dateOfDeath));
+    
     return errors;
   };
 
@@ -379,12 +397,16 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
         updatedBy: user?.uid || 'system',
         basicInfo: {
           ...formData.basicInfo,
-          dateOfBirth: formData.basicInfo.dateOfBirth instanceof Timestamp 
-            ? formData.basicInfo.dateOfBirth 
-            : Timestamp.fromDate(formData.basicInfo.dateOfBirth),
-          dateOfDeath: formData.basicInfo.dateOfDeath instanceof Timestamp
-            ? formData.basicInfo.dateOfDeath
-            : formData.basicInfo.dateOfDeath ? Timestamp.fromDate(formData.basicInfo.dateOfDeath) : undefined
+          dateOfBirth: formData.basicInfo.dateOfBirth 
+            ? (formData.basicInfo.dateOfBirth instanceof Timestamp 
+              ? formData.basicInfo.dateOfBirth 
+              : Timestamp.fromDate(formData.basicInfo.dateOfBirth))
+            : null,
+          dateOfDeath: formData.basicInfo.dateOfDeath
+            ? (formData.basicInfo.dateOfDeath instanceof Timestamp
+              ? formData.basicInfo.dateOfDeath
+              : Timestamp.fromDate(formData.basicInfo.dateOfDeath))
+            : null
         },
         lifeStory: {
           ...formData.lifeStory,
@@ -395,7 +417,7 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
         metadata: {
           ...formData.metadata,
           lastModifiedBy: user?.uid || 'system',
-          lastModifiedAt: Timestamp.now().toDate().toISOString(),
+          lastModifiedAt: Timestamp.now(),
           version: (formData.metadata.version || 0) + 1
         }
       };
@@ -487,11 +509,7 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
                         : ''}
                     onChange={(e) => {
                       const newDate = e.target.value ? new Date(e.target.value) : undefined;
-                      validateDateField('dateOfBirth', newDate);
-                      handleInputChange('basicInfo', {
-                        ...formData.basicInfo,
-                        dateOfBirth: newDate
-                      });
+                      handleDateChange('dateOfBirth', newDate);
                     }}
                     max={new Date().toISOString().split('T')[0]}
                     className={`mt-1 ${fieldErrors.dateOfBirth ? 'border-red-500' : ''}`}
@@ -512,11 +530,7 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
                         : ''}
                     onChange={(e) => {
                       const newDate = e.target.value ? new Date(e.target.value) : undefined;
-                      validateDateField('dateOfDeath', newDate);
-                      handleInputChange('basicInfo', {
-                        ...formData.basicInfo,
-                        dateOfDeath: newDate
-                      });
+                      handleDateChange('dateOfDeath', newDate);
                     }}
                     min={formData.basicInfo.dateOfBirth 
                       ? (formData.basicInfo.dateOfBirth instanceof Date 

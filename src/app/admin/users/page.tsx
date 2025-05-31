@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
+import { useStoriatsAdmins } from '@/hooks/useStoriatsAdmins';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Icon } from '@/components/ui/Icon';
 import {
   Table,
   Header,
@@ -28,13 +30,10 @@ import type { User } from '@/types/user';
 
 const ITEMS_PER_PAGE = 10;
 
-function assertDb() {
-  throw new Error('Do not use assertDb. Use getDb() instead.');
-}
-
 export default function UsersPage() {
   const router = useRouter();
-  const { user, isAdmin, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { isStoriatsAdmin, loading: storiatsAdminsLoading } = useStoriatsAdmins();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -42,16 +41,42 @@ export default function UsersPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [filterRole, setFilterRole] = useState('');
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
+  // Handle access control and redirects
   useEffect(() => {
-    if (authLoading) return;
-    
-    if (!isAdmin) {
+    if (authLoading || storiatsAdminsLoading) {
+      setIsCheckingAccess(true);
+      return;
+    }
+
+    if (!user?.email) {
+      console.log('[Admin Check] No user email, redirecting to landing');
       router.push('/');
       return;
     }
+
+    const userEmail = user.email.toLowerCase();
+    const isUserAdmin = isStoriatsAdmin(userEmail);
+
+    console.log('[Admin Check] Access check:', {
+      email: userEmail,
+      isAdmin: isUserAdmin
+    });
+
+    setIsCheckingAccess(false);
+
+    if (!isUserAdmin) {
+      console.log('[Admin Check] Access denied, redirecting to landing');
+      router.push('/');
+    }
+  }, [user?.email, isStoriatsAdmin, authLoading, storiatsAdminsLoading, router]);
+
+  // Fetch users
+  useEffect(() => {
+    if (isCheckingAccess) return;
 
     const fetchUsers = async () => {
       try {
@@ -72,7 +97,7 @@ export default function UsersPage() {
     };
 
     fetchUsers();
-  }, [isAdmin, router, authLoading]);
+  }, [isCheckingAccess]);
 
   const filteredUsers = users.filter(user => {
     const searchLower = debouncedSearchTerm.toLowerCase();
@@ -110,16 +135,40 @@ export default function UsersPage() {
     'Escape': () => setShowDeleteDialog(false)
   });
 
-  if (authLoading || loading) {
+  if (isCheckingAccess || authLoading || storiatsAdminsLoading || loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <Spinner />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
+        <Spinner className="w-8 h-8 text-indigo-600" />
       </div>
     );
   }
 
-  if (!isAdmin) {
-    return null;
+  if (!user?.email) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
+        <Card className="max-w-md w-full p-6">
+          <div className="text-center">
+            <Icon name="lock" className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
+            <p className="text-gray-600 mb-4">Please log in to access this page</p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!isStoriatsAdmin(user.email.toLowerCase())) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
+        <Card className="max-w-md w-full p-6">
+          <div className="text-center">
+            <Icon name="alert-circle" className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
+            <p className="text-gray-600 mb-4">You do not have permission to access this page</p>
+          </div>
+        </Card>
+      </div>
+    );
   }
 
   return (

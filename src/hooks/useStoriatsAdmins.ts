@@ -75,6 +75,7 @@ export const useStoriatsAdmins = () => {
         const data = docSnap.data() as FirestoreAdminSettings;
         const settings: AdminSettings = {
           ...data,
+          adminEmails: data.adminEmails.map(e => e.toLowerCase()),
           lastUpdated: data.lastUpdated.toDate()
         };
         
@@ -224,16 +225,33 @@ export const useStoriatsAdmins = () => {
   };
 
   const isStoriatsAdmin = useCallback((email: string) => {
-    if (!email || !settings) return false;
-    return settings.adminEmails.includes(email.toLowerCase());
+    if (!email || !settings) {
+      console.log('[isStoriatsAdmin] No email or settings loaded.');
+      return false;
+    }
+    const emailLower = email.toLowerCase();
+    const found = settings.adminEmails.map(e => e.toLowerCase()).includes(emailLower);
+    console.log(`[isStoriatsAdmin] Checking admin for: ${emailLower}, found: ${found}`);
+    return found;
   }, [settings]);
 
   // Initial fetch
   useEffect(() => {
     console.log('Initial fetch of admin settings');
-    fetchSettings().catch(error => {
-      console.error('Failed to fetch initial admin settings:', error);
-    });
+    const initializeSettings = async () => {
+      try {
+        await fetchSettings(true); // Force fetch on initialization
+      } catch (error) {
+        console.error('Failed to fetch initial admin settings:', error);
+        // Initialize with empty settings if fetch fails
+        setSettings({
+          adminEmails: [],
+          lastUpdated: new Date(),
+          updatedBy: 'system'
+        });
+      }
+    };
+    initializeSettings();
   }, [fetchSettings]);
 
   // Transform settings into the expected format for the admin management page

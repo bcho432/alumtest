@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { toast } = useToast();
 
-  const { isStoriatsAdmin } = useStoriatsAdmins();
+  const { isStoriatsAdmin, loading: storiatsAdminsLoading, error: storiatsAdminsError } = useStoriatsAdmins();
 
   useEffect(() => {
     console.log('[Auth Context] Setting up auth state listener');
@@ -64,23 +64,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               const db = await getDb();
               const userDoc = await getDoc(doc(db, 'users', user.uid));
               
+              // Wait for admin settings to load
+              if (storiatsAdminsLoading) {
+                console.log('[Auth Context] Waiting for admin settings to load...');
+                setLoading(true);
+                return;
+              }
+              if (storiatsAdminsError) {
+                console.error('[Auth Context] Error loading admin settings:', storiatsAdminsError);
+                setIsAdmin(false);
+                setUserRoles({
+                  isAdmin: false,
+                  profileRoles: {},
+                  isLoading: false,
+                  error: storiatsAdminsError
+                });
+                setLoading(false);
+                setInitializing(false);
+                return;
+              }
+
               if (userDoc.exists()) {
                 const userData = userDoc.data();
                 // First check local admin status
                 const isLocalAdmin = userData.isAdmin || false;
-                
                 // Then check Storiats admin status
                 const isStoriatsAdminUser = user.email ? isStoriatsAdmin(user.email.toLowerCase()) : false;
-                
                 const isUserAdmin = isLocalAdmin || isStoriatsAdminUser;
-                
                 console.log('[Auth Context] Admin status check:', {
                   email: user.email,
                   isLocalAdmin,
                   isStoriatsAdminUser,
                   isUserAdmin
                 });
-                
                 setIsAdmin(isUserAdmin);
                 setUserRoles({
                   isAdmin: isUserAdmin,
@@ -141,7 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         unsubscribe.then(unsub => unsub && unsub());
       }
     };
-  }, [isStoriatsAdmin]);
+  }, [isStoriatsAdmin, storiatsAdminsLoading, storiatsAdminsError]);
 
   const signIn = async (data: SignInFormData) => {
     const { auth } = await getFirebaseServices();

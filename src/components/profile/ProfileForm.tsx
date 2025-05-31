@@ -145,8 +145,8 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
                   description: '',
                   imageUrl: '',
                   basicInfo: {
-                    dateOfBirth: new Date(),
-                    dateOfDeath: new Date(),
+                    dateOfBirth: Timestamp.now(),
+                    dateOfDeath: Timestamp.now(),
                     biography: '',
                     photo: '',
                     birthLocation: '',
@@ -154,7 +154,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
                   },
                   lifeStory: {
                     content: '',
-                    updatedAt: new Date()
+                    updatedAt: Timestamp.now()
                   }
                 } as MemorialProfile);
               } else {

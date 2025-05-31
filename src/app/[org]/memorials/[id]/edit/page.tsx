@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { MemorialProfileForm } from '@/components/profile/MemorialProfileForm';
 import { Icon } from '@/components/ui/Icon';
 import { toast } from 'react-hot-toast';
-import { MemorialProfile } from '@/types/profile';
+import { MemorialProfile, MemorialProfileFormData } from '@/types/profile';
 import { getFirebaseServices } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Timestamp } from 'firebase/firestore';
@@ -43,19 +43,40 @@ export default function EditMemorialPage() {
     fetchMemorial();
   }, [org, id, router]);
 
-  const handleSubmit = async (data: Partial<MemorialProfile>) => {
+  const handleSubmit = async (data: MemorialProfileFormData) => {
     try {
       const { db } = await getFirebaseServices();
+      if (!db) return;
+
       const memorialRef = doc(db, `universities/${org}/profiles`, id as string);
       
-      const updateData = {
+      // Convert dates to Timestamps
+      const profileData: Partial<MemorialProfile> = {
         ...data,
-        updatedBy: user?.uid,
-        updatedAt: Timestamp.fromDate(new Date()),
+        basicInfo: {
+          ...data.basicInfo,
+          dateOfBirth: data.basicInfo.dateOfBirth 
+            ? (data.basicInfo.dateOfBirth instanceof Timestamp 
+              ? data.basicInfo.dateOfBirth 
+              : Timestamp.fromDate(new Date(data.basicInfo.dateOfBirth)))
+            : null,
+          dateOfDeath: data.basicInfo.dateOfDeath
+            ? (data.basicInfo.dateOfDeath instanceof Timestamp
+              ? data.basicInfo.dateOfDeath
+              : Timestamp.fromDate(new Date(data.basicInfo.dateOfDeath)))
+            : null
+        },
+        lifeStory: data.lifeStory ? {
+          content: data.lifeStory.content,
+          updatedAt: data.lifeStory.updatedAt instanceof Timestamp 
+            ? data.lifeStory.updatedAt 
+            : Timestamp.fromDate(new Date(data.lifeStory.updatedAt))
+        } : undefined,
+        updatedAt: Timestamp.now(),
+        updatedBy: user?.uid || 'system'
       };
 
-      await updateDoc(memorialRef, updateData);
-
+      await updateDoc(memorialRef, profileData);
       toast.success('Memorial updated successfully');
       router.push(`/${org}/memorials/${id}`);
     } catch (error) {

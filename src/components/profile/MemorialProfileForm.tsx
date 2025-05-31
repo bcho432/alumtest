@@ -4,7 +4,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Button } from '@/components/ui/Button';
-import { MemorialProfile, TimelineEvent } from '@/types/profile';
+import { MemorialProfile, MemorialProfileFormData, TimelineEvent } from '@/types/profile';
 import { toast } from 'react-hot-toast';
 import { Badge } from '@/components/ui/Badge';
 import { ImageUpload } from '@/components/ui/ImageUpload';
@@ -14,7 +14,6 @@ import { Card } from '@/components/ui/Card';
 import { Dialog } from '@/components/ui/Dialog';
 import debounce from 'lodash/debounce';
 import { Timestamp } from 'firebase/firestore';
-import { MemorialProfileFormData } from '@/app/[org]/memorials/new/page';
 
 interface MemorialProfileFormProps {
   profile?: MemorialProfile;

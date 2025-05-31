@@ -103,12 +103,36 @@ export function useCreateProfile() {
             dateOfBirth: params.basicInfo?.dateOfBirth 
               ? (params.basicInfo.dateOfBirth instanceof Timestamp 
                 ? params.basicInfo.dateOfBirth 
-                : Timestamp.fromDate(new Date(params.basicInfo.dateOfBirth)))
+                : (() => {
+                    try {
+                      const date = new Date(params.basicInfo.dateOfBirth);
+                      if (isNaN(date.getTime())) {
+                        console.warn('Invalid date of birth, setting to null');
+                        return null;
+                      }
+                      return Timestamp.fromDate(date);
+                    } catch (error) {
+                      console.warn('Error converting date of birth, setting to null:', error);
+                      return null;
+                    }
+                  })())
               : null,
             dateOfDeath: params.basicInfo?.dateOfDeath
               ? (params.basicInfo.dateOfDeath instanceof Timestamp
                 ? params.basicInfo.dateOfDeath
-                : Timestamp.fromDate(new Date(params.basicInfo.dateOfDeath)))
+                : (() => {
+                    try {
+                      const date = new Date(params.basicInfo.dateOfDeath);
+                      if (isNaN(date.getTime())) {
+                        console.warn('Invalid date of death, setting to null');
+                        return null;
+                      }
+                      return Timestamp.fromDate(date);
+                    } catch (error) {
+                      console.warn('Error converting date of death, setting to null:', error);
+                      return null;
+                    }
+                  })())
               : null,
             biography: params.basicInfo?.biography || '',
             photo: params.basicInfo?.photo || '',
@@ -117,7 +141,7 @@ export function useCreateProfile() {
           },
           lifeStory: {
             content: params.lifeStory?.content || '',
-            updatedAt: params.lifeStory?.updatedAt instanceof Timestamp ? params.lifeStory.updatedAt : params.lifeStory?.updatedAt ? Timestamp.fromDate(params.lifeStory.updatedAt) : Timestamp.now()
+            updatedAt: Timestamp.now()
           }
         } as MemorialProfile;
       } else {

@@ -6,23 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { MemorialProfileForm } from '@/components/profile/MemorialProfileForm';
 import { useCreateProfile } from '@/hooks/useCreateProfile';
 import { toast } from 'react-hot-toast';
-import { MemorialProfile } from '@/types/profile';
+import { MemorialProfile, MemorialProfileFormData } from '@/types/profile';
 import { Timestamp } from 'firebase/firestore';
-
-export type MemorialProfileFormData = Omit<MemorialProfile, 'basicInfo' | 'lifeStory'> & {
-  basicInfo: {
-    dateOfBirth: Date | Timestamp;
-    dateOfDeath: Date | Timestamp;
-    biography: string;
-    photo: string;
-    birthLocation: string;
-    deathLocation: string;
-  };
-  lifeStory?: {
-    content: string;
-    updatedAt: Date | Timestamp;
-  };
-};
 
 export default function NewMemorialPage() {
   const { org } = useParams();

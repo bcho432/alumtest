@@ -2,97 +2,100 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
+import { useStoriatsAdmins } from '@/hooks/useStoriatsAdmins';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Spinner } from '@/components/ui/Spinner';
 import { Icon } from '@/components/ui/Icon';
-import { universitiesService } from '@/services/universities';
-import type { University } from '@/types';
+import { Spinner } from '@/components/ui/Spinner';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const { user, loading, isAdmin } = useAuth();
-  const [universities, setUniversities] = useState<University[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { user, loading: authLoading } = useAuth();
+  const { isStoriatsAdmin, loading: storiatsAdminsLoading } = useStoriatsAdmins();
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
 
+  // Handle access control and redirects
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/auth/login');
+    if (authLoading || storiatsAdminsLoading) {
+      setIsCheckingAccess(true);
       return;
     }
 
-    if (!loading && !isAdmin) {
+    if (!user?.email) {
+      console.log('[Admin Check] No user email, redirecting to landing');
       router.push('/');
       return;
     }
 
-    if (user && isAdmin) {
-      loadUniversities();
-    }
-  }, [user, loading, isAdmin, router]);
+    const userEmail = user.email.toLowerCase();
+    const isUserAdmin = isStoriatsAdmin(userEmail);
 
-  const loadUniversities = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const unis = await universitiesService.listUniversities();
-      setUniversities(unis);
-    } catch (error) {
-      console.error('Error loading universities:', error);
-      setError('Failed to load universities. Please try again.');
-    } finally {
-      setIsLoading(false);
+    console.log('[Admin Check] Access check:', {
+      email: userEmail,
+      isAdmin: isUserAdmin
+    });
+
+    setIsCheckingAccess(false);
+
+    if (!isUserAdmin) {
+      console.log('[Admin Check] Access denied, redirecting to landing');
+      router.push('/');
     }
-  };
+  }, [user?.email, isStoriatsAdmin, authLoading, storiatsAdminsLoading, router]);
 
   const handleNavigation = (path: string) => {
     router.push(path);
   };
 
-  if (loading || isLoading) {
+  if (isCheckingAccess || authLoading || storiatsAdminsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
-        <div className="text-center">
-          <Spinner className="w-8 h-8 text-indigo-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading dashboard...</p>
-        </div>
+        <Spinner className="w-8 h-8 text-indigo-600" />
       </div>
     );
   }
 
-  if (error) {
+  if (!user?.email) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
-          <Button onClick={loadUniversities} variant="primary">
-            Retry
-          </Button>
-        </div>
+        <Card className="max-w-md w-full p-6">
+          <div className="text-center">
+            <Icon name="lock" className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
+            <p className="text-gray-600 mb-4">Please log in to access this page</p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!isStoriatsAdmin(user.email.toLowerCase())) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
+        <Card className="max-w-md w-full p-6">
+          <div className="text-center">
+            <Icon name="alert-circle" className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
+            <p className="text-gray-600 mb-4">You do not have permission to access this page</p>
+          </div>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
-              Storiats Admin Dashboard
-            </h1>
-            <p className="mt-2 text-gray-600">Manage universities, users, and platform settings</p>
-          </div>
-          <Button 
-            onClick={() => handleNavigation('/admin/universities/new')}
-            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-          >
-            <Icon name="plus" className="w-5 h-5 mr-2" />
-            Create University
-          </Button>
-        </div>
+    <div className="container mx-auto px-4 py-8">
+      <Breadcrumbs
+        items={[
+          { label: 'Admin' }
+        ]}
+      />
+
+      <div className="mt-6">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+        <p className="text-gray-600 mb-8">Manage your platform settings and users</p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Card className="p-6 bg-white/80 backdrop-blur-sm border border-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300">
@@ -125,57 +128,15 @@ export default function AdminDashboard() {
 
           <Card className="p-6 bg-white/80 backdrop-blur-sm border border-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Content</h2>
-              <Icon name="lifeStory" className="w-6 h-6 text-indigo-600" />
+              <h2 className="text-xl font-semibold text-gray-900">Platform Settings</h2>
+              <Icon name="settings" className="w-6 h-6 text-indigo-600" />
             </div>
-            <p className="mb-4 text-gray-600">Manage memorials and media content</p>
-            <Button 
-              onClick={() => handleNavigation('/admin/content')}
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-            >
-              Manage Content
-            </Button>
-          </Card>
-
-          <Card className="p-6 bg-white/80 backdrop-blur-sm border border-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Analytics</h2>
-              <Icon name="timeline" className="w-6 h-6 text-indigo-600" />
-            </div>
-            <p className="mb-4 text-gray-600">View platform usage and engagement metrics</p>
-            <Button 
-              onClick={() => handleNavigation('/admin/analytics')}
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-            >
-              View Analytics
-            </Button>
-          </Card>
-
-          <Card className="p-6 bg-white/80 backdrop-blur-sm border border-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Support</h2>
-              <Icon name="support" className="w-6 h-6 text-indigo-600" />
-            </div>
-            <p className="mb-4 text-gray-600">View and manage support requests</p>
-            <Button 
-              onClick={() => handleNavigation('/admin/support')}
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-            >
-              Support Dashboard
-            </Button>
-          </Card>
-
-          <Card className="p-6 bg-white/80 backdrop-blur-sm border border-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Settings</h2>
-              <Icon name="cog" className="w-6 h-6 text-indigo-600" />
-            </div>
-            <p className="mb-4 text-gray-600">Configure platform settings and features</p>
+            <p className="mb-4 text-gray-600">Configure platform-wide settings and admin access</p>
             <Button 
               onClick={() => handleNavigation('/admin/settings')}
               className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
             >
-              Platform Settings
+              Manage Settings
             </Button>
           </Card>
         </div>

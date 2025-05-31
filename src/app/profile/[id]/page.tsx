@@ -130,6 +130,26 @@ const RequestToJoinButton: React.FC<RequestToJoinButtonProps> = ({ universityId,
   );
 };
 
+// Add type guard functions at the top of the file
+const isTimestamp = (value: unknown): value is Timestamp => {
+  return value instanceof Timestamp;
+};
+
+const isDate = (value: unknown): value is Date => {
+  return value instanceof Date;
+};
+
+const formatDate = (date: Timestamp | Date | null | undefined): string => {
+  if (!date) return 'Not specified';
+  try {
+    const dateObj = date instanceof Timestamp ? date.toDate() : date;
+    return dateObj instanceof Date ? dateObj.toLocaleDateString() : 'Invalid date';
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Invalid date';
+  }
+};
+
 export default function ProfilePage() {
   const { id } = useParams();
   const router = useRouter();
@@ -332,29 +352,13 @@ export default function ProfilePage() {
                         <div>
                           <dt className="text-sm font-medium text-gray-500">Date of Birth</dt>
                           <dd className="mt-1 text-sm text-gray-900">
-                            {(() => {
-                              const dob = (profile as MemorialProfile).basicInfo.dateOfBirth;
-                              if (dob instanceof Timestamp) {
-                                return dob.toDate().toLocaleDateString();
-                              } else if (dob instanceof Date) {
-                                return dob.toLocaleDateString();
-                              }
-                              return '';
-                            })()}
+                            {formatDate((profile as MemorialProfile).basicInfo?.dateOfBirth)}
                           </dd>
                         </div>
                         <div>
                           <dt className="text-sm font-medium text-gray-500">Date of Death</dt>
                           <dd className="mt-1 text-sm text-gray-900">
-                            {(() => {
-                              const dod = (profile as MemorialProfile).basicInfo.dateOfDeath;
-                              if (dod instanceof Timestamp) {
-                                return dod.toDate().toLocaleDateString();
-                              } else if (dod instanceof Date) {
-                                return dod.toLocaleDateString();
-                              }
-                              return '';
-                            })()}
+                            {formatDate((profile as MemorialProfile).basicInfo?.dateOfDeath)}
                           </dd>
                         </div>
                         <div>

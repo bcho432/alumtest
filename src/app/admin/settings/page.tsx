@@ -15,15 +15,16 @@ import { validateEmail } from '@/lib/validation';
 import { useRouter } from 'next/navigation';
 
 export default function StoriatsAdminSettingsPage() {
-  const { user } = useAuth();
+  const { user, isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const {
     settings,
-    loading,
+    loading: storiatsAdminsLoading,
     addAdmin,
     removeAdmin,
     isStoriatsAdmin,
-    refreshSettings
+    refreshSettings,
+    error: storiatsAdminsError
   } = useStoriatsAdmins();
   const router = useRouter();
 
@@ -32,37 +33,16 @@ export default function StoriatsAdminSettingsPage() {
   const [isRemoving, setIsRemoving] = useState<string | null>(null);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState<string | null>(null);
   const [isCheckingAccess, setIsCheckingAccess] = useState(true);
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-
-  // Check admin access
-  useEffect(() => {
-    const checkAccess = async () => {
-      if (!user?.email) {
-        console.log('[Admin Check] No user email, redirecting to landing');
-        router.push('/');
-        return;
-      }
-
-      console.log('[Admin Check] Starting access check, user:', user.email);
-      const hasAccess = isStoriatsAdmin(user.email.toLowerCase());
-      console.log('[Admin Check] Admin status result:', { email: user.email, hasAccess });
-
-      if (!hasAccess) {
-        console.log('[Admin Check] Access denied, redirecting to landing');
-        router.push('/');
-      }
-    };
-
-    checkAccess();
-  }, [user?.email, isStoriatsAdmin, router]);
 
   // Track auth state changes
   useEffect(() => {
-    console.log('[Auth State] Changed:', {
-      userId: user?.uid,
-      email: user?.email,
-      isAdmin: isStoriatsAdmin(user?.email?.toLowerCase() || '')
-    });
+    if (user?.email) {
+      console.log('[Auth State] Changed:', {
+        userId: user?.uid,
+        email: user?.email,
+        isAdmin: isStoriatsAdmin(user.email.toLowerCase())
+      });
+    }
   }, [user, isStoriatsAdmin]);
 
   // Fetch settings only once on mount
@@ -78,6 +58,42 @@ export default function StoriatsAdminSettingsPage() {
     fetchSettings();
   }, []); // Empty dependency array to run only once
 
+  // Handle access control and redirects
+  useEffect(() => {
+    if (authLoading || storiatsAdminsLoading) {
+      setIsCheckingAccess(true);
+      return;
+    }
+
+    if (storiatsAdminsError) {
+      console.error('[Admin Check] Error loading admin settings:', storiatsAdminsError);
+      setIsCheckingAccess(false);
+      return;
+    }
+
+    if (!user?.email) {
+      console.log('[Admin Check] No user email, redirecting to landing');
+      router.push('/');
+      return;
+    }
+
+    const userEmail = user.email.toLowerCase();
+    const isUserAdmin = isStoriatsAdmin(userEmail);
+
+    console.log('[Admin Check] Access check:', {
+      email: userEmail,
+      isAdmin: isUserAdmin,
+      settingsLoaded: !!settings
+    });
+
+    setIsCheckingAccess(false);
+
+    if (!isUserAdmin) {
+      console.log('[Admin Check] Access denied, redirecting to landing');
+      router.push('/');
+    }
+  }, [user?.email, isStoriatsAdmin, authLoading, storiatsAdminsLoading, storiatsAdminsError, router, settings]);
+
   const handleAddAdmin = async () => {
     if (!user?.email) return;
 
@@ -89,7 +105,7 @@ export default function StoriatsAdminSettingsPage() {
       }
 
       setIsAdding(true);
-      await addAdmin(newAdminEmail, newAdminEmail.split('@')[0], user.email);
+      await addAdmin(newAdminEmail.toLowerCase(), newAdminEmail.split('@')[0], user.email.toLowerCase());
       setNewAdminEmail('');
       toast('Admin email added successfully');
     } catch (error) {
@@ -104,7 +120,7 @@ export default function StoriatsAdminSettingsPage() {
 
     try {
       setIsRemoving(email);
-      await removeAdmin(email, user.email);
+      await removeAdmin(email.toLowerCase(), user.email.toLowerCase());
       toast('Admin email removed successfully');
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Failed to remove admin email');
@@ -114,7 +130,7 @@ export default function StoriatsAdminSettingsPage() {
     }
   };
 
-  if (isCheckingAccess || isAdmin === null) {
+  if (isCheckingAccess || authLoading || storiatsAdminsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
         <Spinner className="w-8 h-8 text-indigo-600" />
@@ -136,7 +152,7 @@ export default function StoriatsAdminSettingsPage() {
     );
   }
 
-  if (!isAdmin) {
+  if (!isStoriatsAdmin(user.email.toLowerCase())) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
         <Card className="max-w-md w-full p-6">
@@ -146,14 +162,6 @@ export default function StoriatsAdminSettingsPage() {
             <p className="text-gray-600 mb-4">You do not have permission to access this page</p>
           </div>
         </Card>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
-        <Spinner className="w-8 h-8 text-indigo-600" />
       </div>
     );
   }
@@ -177,10 +185,10 @@ export default function StoriatsAdminSettingsPage() {
               </div>
               <Button
                 onClick={() => refreshSettings()}
-                disabled={loading}
+                disabled={storiatsAdminsLoading}
                 className="flex items-center gap-2"
               >
-                {loading ? (
+                {storiatsAdminsLoading ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <Icon name="sync" />
