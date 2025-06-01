@@ -26,7 +26,7 @@ export const ProfilePreview: React.FC = () => {
     const checkPermission = async () => {
       let orgOrUniversityId = '';
       if (profile?.type === 'memorial') {
-        orgOrUniversityId = profile.universityId;
+        orgOrUniversityId = profile.universityId || '';
       } else if ('orgId' in (profile || {})) {
         orgOrUniversityId = (profile as any).orgId || '';
       }

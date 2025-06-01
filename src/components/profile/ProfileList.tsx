@@ -36,8 +36,8 @@ export const ProfileList: React.FC<ProfileListProps> = ({
   const filteredProfiles = profiles
     .filter(profile => {
       const matchesSearch = profile.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (profile.type === 'personal' && (profile as PersonalProfile).bio?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (profile.type === 'memorial' && (profile as MemorialProfile).description?.toLowerCase().includes(searchTerm.toLowerCase()));
+        (profile.type === 'personal' && ((profile as unknown) as PersonalProfile).bio?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (profile.type === 'memorial' && ((profile as unknown) as MemorialProfile).description?.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesFilter = filterBy === 'all' || profile.status === filterBy;
       return matchesSearch && matchesFilter;
     })
@@ -158,7 +158,7 @@ export const ProfileList: React.FC<ProfileListProps> = ({
             transition={{ duration: 0.2 }}
           >
             <EnhancedProfileCard
-              profile={profile}
+              profile={profile as unknown as import('@/types/profile').BaseProfile}
               variant={viewMode === 'grid' ? 'detailed' : 'compact'}
               onEdit={() => router.push(`/profile/${profile.id}/edit`)}
               onShare={() => handleShare(profile.id)}

@@ -5,13 +5,13 @@ interface ProfileDisplayProps {
   profile: Profile;
 }
 
-const isMemorialProfile = (profile: Profile): profile is MemorialProfile => {
+function isMemorialProfile(profile: Profile): boolean {
   return profile.type === 'memorial';
-};
+}
 
-const isPersonalProfile = (profile: Profile): profile is PersonalProfile => {
+function isPersonalProfile(profile: Profile): boolean {
   return profile.type === 'personal';
-};
+}
 
 export const ProfileDisplay: React.FC<ProfileDisplayProps> = ({ profile }) => {
   const formatDate = (date: Date | Timestamp | null | undefined): string => {
@@ -27,10 +27,10 @@ export const ProfileDisplay: React.FC<ProfileDisplayProps> = ({ profile }) => {
 
   const getPhotoUrl = (profile: Profile): string | undefined => {
     if (isMemorialProfile(profile)) {
-      return profile.basicInfo?.photo;
+      return ((profile as unknown) as MemorialProfile).basicInfo?.photo;
     }
     if (isPersonalProfile(profile)) {
-      return profile.photoURL;
+      return ((profile as unknown) as PersonalProfile).photoURL;
     }
     return undefined;
   };
@@ -49,8 +49,8 @@ export const ProfileDisplay: React.FC<ProfileDisplayProps> = ({ profile }) => {
           <h1 className="text-2xl font-bold">{profile.name}</h1>
           {isMemorialProfile(profile) && (
             <div className="text-gray-600">
-              <p>Born: {formatDate(profile.basicInfo?.dateOfBirth)}</p>
-              <p>Died: {formatDate(profile.basicInfo?.dateOfDeath)}</p>
+              <p>Born: {formatDate(((profile as unknown) as MemorialProfile).basicInfo?.dateOfBirth)}</p>
+              <p>Died: {formatDate(((profile as unknown) as MemorialProfile).basicInfo?.dateOfDeath)}</p>
             </div>
           )}
         </div>
@@ -59,14 +59,14 @@ export const ProfileDisplay: React.FC<ProfileDisplayProps> = ({ profile }) => {
       {isMemorialProfile(profile) && (
         <div className="mb-6">
           <h2 className="text-xl font-semibold mb-2">Life Story</h2>
-          <p className="text-gray-700">{profile.lifeStory?.content}</p>
+          <p className="text-gray-700">{((profile as unknown) as MemorialProfile).lifeStory?.content}</p>
         </div>
       )}
       
       {isPersonalProfile(profile) && (
         <div className="mb-6">
           <h2 className="text-xl font-semibold mb-2">Bio</h2>
-          <p className="text-gray-700">{profile.bio}</p>
+          <p className="text-gray-700">{((profile as unknown) as PersonalProfile).bio}</p>
         </div>
       )}
     </div>

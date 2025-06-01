@@ -234,7 +234,7 @@ export function ProfileList({ universityId }: ProfileListProps) {
                     View
                   </Button>
                 </Link>
-                <Link href={`/memorials/${profile.id}/edit`}>
+                <Link href={`/admin/universities/${universityId}/profiles/${profile.id}/edit`}>
                   <Button variant="outline" size="sm">
                     <Icon name="edit" className="h-4 w-4 mr-2" />
                     Edit

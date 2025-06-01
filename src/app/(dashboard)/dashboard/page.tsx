@@ -31,12 +31,23 @@ const DashboardContent = () => {
   const [error, setError] = useState<string | null>(null);
 
   const handleNavigation = (path: string) => {
-    try {
-      if (typeof window !== 'undefined') {
-        window.location.href = path;
+    if (path.startsWith('/university/')) {
+      const universityId = path.split('/').pop();
+      console.log('Finding university for ID:', universityId);
+      const university = adminUniversities.find(u => u.id === universityId);
+      if (university) {
+        const urlName = university.name.toLowerCase().replace(/\s+/g, '-');
+        console.log('Navigating to university:', {
+          originalName: university.name,
+          urlName,
+          id: university.id
+        });
+        router.push(`/university/${urlName}`);
+      } else {
+        console.error('University not found for ID:', universityId);
       }
-    } catch (error) {
-      console.error('Navigation error:', error);
+    } else {
+      router.push(path);
     }
   };
 

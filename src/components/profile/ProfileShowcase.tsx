@@ -10,13 +10,13 @@ interface ProfileShowcaseProps {
   profile: Profile;
 }
 
-const isMemorialProfile = (profile: Profile): profile is MemorialProfile => {
+function isMemorialProfile(profile: Profile): boolean {
   return profile.type === 'memorial';
-};
+}
 
-const isPersonalProfile = (profile: Profile): profile is PersonalProfile => {
+function isPersonalProfile(profile: Profile): boolean {
   return profile.type === 'personal';
-};
+}
 
 const formatDate = (date: Date | Timestamp | null | undefined): string => {
   if (!date) return 'Not specified';
@@ -29,15 +29,14 @@ const formatDate = (date: Date | Timestamp | null | undefined): string => {
   return 'Invalid date';
 };
 
-// Add type guard for description
-const hasDescription = (profile: Profile): profile is MemorialProfile => {
+// Add boolean guards for description and timelineEvents
+function hasDescription(profile: Profile): boolean {
   return isMemorialProfile(profile) && 'description' in profile;
-};
+}
 
-// Add type guard for timelineEvents
-const hasTimelineEvents = (profile: Profile): profile is MemorialProfile & { timelineEvents: TimelineEvent[] } => {
-  return isMemorialProfile(profile) && 'timelineEvents' in profile && Array.isArray(profile.timelineEvents);
-};
+function hasTimelineEvents(profile: Profile): boolean {
+  return isMemorialProfile(profile) && 'timelineEvents' in profile && Array.isArray((profile as any).timelineEvents);
+}
 
 const timelineEventToLifeEvent = (event: any) => ({
   ...event,
@@ -47,10 +46,10 @@ const timelineEventToLifeEvent = (event: any) => ({
 export const ProfileShowcase: React.FC<ProfileShowcaseProps> = ({ profile }) => {
   const getPhotoUrl = (profile: Profile): string | undefined => {
     if (isMemorialProfile(profile)) {
-      return profile.basicInfo?.photo;
+      return ((profile as unknown) as MemorialProfile).basicInfo?.photo;
     }
     if (isPersonalProfile(profile)) {
-      return profile.photoURL;
+      return ((profile as unknown) as PersonalProfile).photoURL;
     }
     return undefined;
   };
@@ -95,15 +94,15 @@ export const ProfileShowcase: React.FC<ProfileShowcaseProps> = ({ profile }) => 
               transition={{ delay: 0.5 }}
               className="text-gray-600"
             >
-              <p>Born: {formatDate(profile.basicInfo?.dateOfBirth)}</p>
-              <p>Died: {formatDate(profile.basicInfo?.dateOfDeath)}</p>
+              <p>Born: {formatDate(((profile as unknown) as MemorialProfile).basicInfo?.dateOfBirth)}</p>
+              <p>Died: {formatDate(((profile as unknown) as MemorialProfile).basicInfo?.dateOfDeath)}</p>
             </motion.div>
           )}
         </div>
       </motion.div>
 
       {/* Description */}
-      {hasDescription(profile) && profile.description && (
+      {hasDescription(profile) && ((profile as unknown) as MemorialProfile).description && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -111,12 +110,12 @@ export const ProfileShowcase: React.FC<ProfileShowcaseProps> = ({ profile }) => 
           className="mb-6"
         >
           <h2 className="text-xl font-semibold mb-2">Description</h2>
-          <p className="text-gray-700">{profile.description}</p>
+          <p className="text-gray-700">{((profile as unknown) as MemorialProfile).description}</p>
         </motion.div>
       )}
 
       {/* Life Story */}
-      {isMemorialProfile(profile) && profile.lifeStory?.content && (
+      {isMemorialProfile(profile) && ((profile as unknown) as MemorialProfile).lifeStory?.content && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -124,12 +123,12 @@ export const ProfileShowcase: React.FC<ProfileShowcaseProps> = ({ profile }) => 
           className="mb-6"
         >
           <h2 className="text-xl font-semibold mb-2">Life Story</h2>
-          <p className="text-gray-700">{profile.lifeStory.content}</p>
+          <p className="text-gray-700">{((profile as unknown) as MemorialProfile).lifeStory?.content}</p>
         </motion.div>
       )}
 
       {/* Timeline */}
-      {hasTimelineEvents(profile) && profile.timelineEvents.length > 0 && (
+      {hasTimelineEvents(profile) && ((profile as any).timelineEvents.length > 0) && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -144,13 +143,13 @@ export const ProfileShowcase: React.FC<ProfileShowcaseProps> = ({ profile }) => 
               // Handle event click if needed
               console.log('Event clicked:', event);
             }}
-            events={profile.timeline.map(timelineEventToLifeEvent)}
+            events={(((profile as unknown) as MemorialProfile).timeline || []).map(timelineEventToLifeEvent)}
           />
         </motion.div>
       )}
 
       {/* Tags */}
-      {profile.metadata?.tags && profile.metadata.tags.length > 0 && (
+      {((profile as any).metadata?.tags && (profile as any).metadata.tags.length > 0) && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -159,7 +158,7 @@ export const ProfileShowcase: React.FC<ProfileShowcaseProps> = ({ profile }) => 
         >
           <h2 className="text-xl font-semibold mb-2">Tags</h2>
           <div className="flex flex-wrap gap-2">
-            {profile.metadata.tags.map((tag) => (
+            {((profile as any).metadata.tags as string[]).map((tag: string) => (
               <Badge key={tag} variant="secondary">
                 {tag}
               </Badge>
@@ -175,9 +174,9 @@ export const ProfileShowcase: React.FC<ProfileShowcaseProps> = ({ profile }) => 
         transition={{ delay: 1.1 }}
         className="flex items-center space-x-2"
       >
-        <Icon name={profile.isPublic ? 'unlock' : 'lock'} className="w-4 h-4" />
+        <Icon name={(profile as any).isPublic ? 'unlock' : 'lock'} className="w-4 h-4" />
         <span className="text-sm text-gray-600">
-          {profile.isPublic ? 'Public' : 'Private'}
+          {(profile as any).isPublic ? 'Public' : 'Private'}
         </span>
       </motion.div>
     </motion.div>

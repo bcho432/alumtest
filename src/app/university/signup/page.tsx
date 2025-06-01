@@ -8,6 +8,9 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { handleFirebaseError } from '@/lib/errors';
 import type { SignUpFormData } from '@/types/auth';
+import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function UniversitySignUpPage() {
   const [step, setStep] = useState(1);
@@ -59,12 +62,33 @@ export default function UniversitySignUpPage() {
         }
       } else {
         if (validateStep2()) {
-          const user = await signUp(form);
+          const userCredential = await createUserWithEmailAndPassword(getAuth(), form.email, form.password);
+          const user = userCredential.user;
+
+          // Create university document
+          const universityData = {
+            name: '',
+            type: 'university',
+            description: '',
+            location: '',
+            website: '',
+            adminIds: [user.uid],
+            memberIds: [],
+            communityPageUrl: `/university/${user.uid}`,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+
+          if (!db) throw new Error('Firestore db is not initialized');
+
+          await setDoc(doc(db, 'universities', user.uid), universityData);
+
+          // Redirect to university page
           router.push(`/university/${user.uid}`);
         }
       }
-    } catch (err) {
-      setError(handleFirebaseError(err).message);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'An error occurred during signup');
     } finally {
       setLoading(false);
     }

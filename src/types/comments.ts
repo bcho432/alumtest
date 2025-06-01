@@ -5,11 +5,12 @@ export interface Comment {
   content: string;
   userId: string;
   userEmail: string;
+  createdAt: Date;
+  updatedAt?: Date;
+  profileId: string;
   authorId: string; // ID of the author (for analytics and display)
   authorName?: string; // Name of the author (for analytics and display)
   authorAvatar?: string; // Avatar URL of the author (for analytics and display)
-  createdAt: any; // Firestore Timestamp
-  updatedAt?: any; // Firestore Timestamp
   isEdited?: boolean;
   isDeleted?: boolean;
   parentId?: string; // Optional parentId for replies

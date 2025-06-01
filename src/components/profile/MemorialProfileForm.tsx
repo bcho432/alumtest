@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Icon } from '@/components/ui/Icon';
 import { Input } from '@/components/ui/Input';
@@ -20,6 +20,9 @@ import { Timestamp } from 'firebase/firestore';
 import { LifeStoryEditor } from '@/components/profile/LifeStoryEditor';
 import { Select } from '@/components/ui/Select';
 import { TimelineBuilder } from '@/components/timeline/TimelineBuilder';
+import { useAuth } from '@/contexts/AuthContext';
+import { getFirebaseServices } from '@/lib/firebase';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 interface MemorialProfileFormProps {
   profile?: MemorialProfile;
@@ -39,6 +42,11 @@ interface FormErrors {
   deathLocation?: string;
 }
 
+interface ProfileLock {
+  userId: string;
+  timestamp: Date;
+}
+
 const timelineEventToLifeEvent = (event: any) => ({
   ...event,
   type: event.type === 'job' ? 'work' : event.type === 'event' ? 'other' : event.type,
@@ -52,11 +60,16 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
 }) => {
   console.log('[MemorialProfileForm] Rendering form with profile:', profile?.id || 'new');
 
+  const { user } = useAuth();
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockError, setLockError] = useState<string | null>(null);
+  const LOCK_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+
   const [formData, setFormData] = useState<MemorialProfileFormData>(() => {
     console.log('[MemorialProfileForm] Initializing form data with profile:', profile);
     return {
       id: profile?.id || '',
-      type: 'memorial',
+    type: 'memorial',
       universityId: profile?.universityId || '',
       createdAt: profile?.createdAt || Timestamp.now(),
       updatedAt: profile?.updatedAt || Timestamp.now(),
@@ -65,31 +78,39 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
       name: profile?.name || '',
       description: profile?.description || '',
       imageUrl: profile?.imageUrl || '',
-      basicInfo: {
+    basicInfo: {
         dateOfBirth: profile?.basicInfo?.dateOfBirth || null,
         dateOfDeath: profile?.basicInfo?.dateOfDeath || null,
         biography: profile?.basicInfo?.biography || '',
         photo: profile?.basicInfo?.photo || '',
         birthLocation: profile?.basicInfo?.birthLocation || '',
         deathLocation: profile?.basicInfo?.deathLocation || ''
-      },
-      lifeStory: {
+    },
+    lifeStory: {
         content: profile?.lifeStory?.content || '',
         updatedAt: profile?.lifeStory?.updatedAt || new Date()
-      },
+    },
       timeline: Array.isArray(profile?.timeline)
         ? profile.timeline.map(timelineEventToLifeEvent)
         : [],
       isPublic: profile?.isPublic || false,
       status: profile?.status || 'draft',
-      metadata: {
+    metadata: {
         tags: profile?.metadata?.tags || [],
         categories: profile?.metadata?.categories || [],
         lastModifiedBy: profile?.metadata?.lastModifiedBy || '',
         lastModifiedAt: profile?.metadata?.lastModifiedAt || Timestamp.fromDate(new Date()),
         version: profile?.metadata?.version || 1
-      }
+    }
     };
+  });
+
+  const [formState, setFormState] = useState({
+    isSaving: false,
+    isTabChanging: false,
+    lastSaveError: null as string | null,
+    lastSaved: null as Date | null,
+    hasUnsavedChanges: false
   });
 
   const [loading, setLoading] = useState(false);
@@ -97,13 +118,91 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
   const [activeTab, setActiveTab] = useState('basic');
   const [completionPercentage, setCompletionPercentage] = useState(0);
   const [errors, setErrors] = useState<FormErrors>({});
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
-  // Debounced auto-save
-  const debouncedSave = useCallback(
-    debounce(async (data: MemorialProfileFormData) => {
+  // Check and acquire lock
+  const checkAndAcquireLock = async () => {
+    if (!profile?.id || !user?.uid) return;
+
+    try {
+      const { db } = await getFirebaseServices();
+      if (!db) return;
+
+      const profileRef = doc(db, `universities/${profile.universityId}/profiles`, profile.id);
+      const profileDoc = await getDoc(profileRef);
+      
+      if (!profileDoc.exists()) return;
+
+      const profileData = profileDoc.data() as MemorialProfile;
+      const now = new Date();
+
+      // Check if there's an existing lock
+      if (profileData.lock) {
+        const lockTime = new Date(profileData.lock.timestamp);
+        const isLockExpired = now.getTime() - lockTime.getTime() > LOCK_TIMEOUT;
+
+        if (!isLockExpired && profileData.lock.userId !== user.uid) {
+          setIsLocked(true);
+          setLockError('This profile is currently being edited by another user. Please try again later.');
+          return false;
+        }
+      }
+
+      // Create or update lock
+      await updateDoc(profileRef, {
+        lock: {
+          userId: user.uid,
+          timestamp: now
+        }
+      });
+
+      setIsLocked(false);
+      setLockError(null);
+      return true;
+    } catch (error) {
+      console.error('Error acquiring lock:', error);
+      setLockError('Failed to acquire edit lock. Please try again.');
+      return false;
+    }
+  };
+
+  // Release lock
+  const releaseLock = async () => {
+    if (!profile?.id || !user?.uid) return;
+
+    try {
+      const { db } = await getFirebaseServices();
+      if (!db) return;
+
+      const profileRef = doc(db, `universities/${profile.universityId}/profiles`, profile.id);
+      await updateDoc(profileRef, {
+        lock: null
+      });
+    } catch (error) {
+      console.error('Error releasing lock:', error);
+    }
+  };
+
+  // Check lock on mount
+  useEffect(() => {
+    if (profile?.id) {
+      checkAndAcquireLock();
+    }
+    return () => {
+      if (profile?.id) {
+        releaseLock();
+      }
+    };
+  }, [profile?.id]);
+
+  // Memoize the debounced save function first
+  const debouncedSave = useMemo(
+    () => debounce(async (data: MemorialProfileFormData) => {
+      if (formState.isSaving) return;
+      
       try {
+        setFormState(prev => ({ ...prev, isSaving: true, lastSaveError: null }));
+        console.log('[MemorialProfileForm] Auto-saving draft...');
+        
         const metadata = {
           tags: data.metadata?.tags || [],
           categories: data.metadata?.categories || [],
@@ -117,30 +216,64 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
           status: 'draft',
           metadata
         });
-        setLastSaved(new Date());
-        setHasUnsavedChanges(false);
+        
+        setFormState(prev => ({
+          ...prev,
+          isSaving: false,
+          lastSaved: new Date(),
+          hasUnsavedChanges: false
+        }));
+        console.log('[MemorialProfileForm] Auto-save completed successfully');
+        toast.success('Changes saved successfully');
       } catch (error) {
-        console.error('Auto-save failed:', error);
+        console.error('[MemorialProfileForm] Auto-save failed:', error);
+        setFormState(prev => ({
+          ...prev,
+          isSaving: false,
+          lastSaveError: 'Failed to auto-save changes'
+        }));
+        toast.error('Failed to auto-save changes');
       }
     }, 2000),
     [onSubmit]
   );
 
-  // Update form data with validation
-  const updateFormData = (updates: Partial<MemorialProfileFormData>): void => {
+  // Update tab change handler
+  const handleTabChange = useCallback((newTab: string) => {
+    if (formState.isTabChanging) return;
+    
+    setFormState(prev => ({ ...prev, isTabChanging: true }));
+    
+    // Save in the background if needed
+    if (formState.hasUnsavedChanges) {
+      debouncedSave(formData);
+    }
+    
+    setActiveTab(newTab);
+    setFormState(prev => ({ ...prev, isTabChanging: false }));
+  }, [formState.isTabChanging, formState.hasUnsavedChanges, debouncedSave, formData]);
+
+  // Update form data handler with memoization
+  const updateFormData = useCallback((updates: Partial<MemorialProfileFormData>): void => {
     const updateKeys = Object.keys(updates);
     const firstKey = updateKeys[0];
     const value = firstKey ? (updates as any)[firstKey] : undefined;
+    
     console.log('[MemorialProfileForm] Updating form data:', {
       updateField: firstKey,
       updateValue: value,
       currentName: formData.name,
       currentDateOfBirth: formData.basicInfo?.dateOfBirth
     });
+    
     const newData = { ...formData, ...updates };
     setFormData(newData);
-    setHasUnsavedChanges(true);
-  };
+    setFormState(prev => ({ ...prev, hasUnsavedChanges: true }));
+    
+    if (!formState.isSaving) {
+      debouncedSave(newData);
+    }
+  }, [formData, formState.isSaving, debouncedSave]);
 
   // Validate form data
   const validateForm = (data: MemorialProfileFormData): boolean => {
@@ -150,7 +283,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
       hasErrors: Object.keys(errors).length > 0
     });
     const newErrors: FormErrors = {};
-
+    
     // Only validate required fields when saving/publishing
     if (!data.name?.trim()) {
       newErrors.name = 'Name is required';
@@ -161,7 +294,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
 
     if (Object.keys(newErrors).length > 0) {
       console.log('[MemorialProfileForm] Validation errors:', newErrors);
-      setErrors(newErrors);
+    setErrors(newErrors);
       return false;
     }
 
@@ -217,74 +350,88 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('[MemorialProfileForm] Form submission started', {
-      name: formData.name,
-      dateOfBirth: formData.basicInfo?.dateOfBirth,
-      completionPercentage,
-      hasErrors: Object.keys(errors).length > 0
-    });
-    setLoading(true);
+  const validateDateInput = (value: string): boolean => {
+    // Check if the input matches the date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(value)) return false;
+
+    // Parse the date and check if it's valid
+    const date = new Date(value);
+    return !isNaN(date.getTime());
+  };
+
+  // Handle form submission
+  const handleSubmit = async (status: 'draft' | 'published' = 'draft') => {
+    if (formState.isSaving) return;
+
     try {
-      if (!validateForm(formData)) {
-        console.log('[MemorialProfileForm] Form validation failed');
-        toast.error('Required Fields Missing: Please fill in the required fields (Name and Date of Birth) before saving.');
-        setLoading(false);
+      setFormState(prev => ({ ...prev, isSaving: true }));
+      
+      // Validate form data before submitting
+      if (status === 'published' && !validateForm(formData)) {
+        toast.error('Please fill in all required fields before publishing');
         return;
       }
-      console.log('[MemorialProfileForm] Form validation passed, proceeding with submission');
-      const metadata = {
-        tags: formData.metadata?.tags || [],
-        categories: formData.metadata?.categories || [],
-        lastModifiedBy: formData.metadata?.lastModifiedBy || '',
-        lastModifiedAt: Timestamp.fromDate(new Date()),
-        version: (formData.metadata?.version || 0) + 1
-      };
-      await onSubmit({
+
+      // Prepare the data for submission
+      const submitData = {
         ...formData,
-        status: 'published',
-        metadata
+        status,
+        updatedAt: Timestamp.now(),
+        updatedBy: user?.uid || 'system'
+      };
+
+      const submitDataRecord = submitData as Record<string, any>;
+      Object.keys(submitDataRecord).forEach(key => {
+        if (submitDataRecord[key] === undefined) {
+          delete submitDataRecord[key];
+        }
       });
-      console.log('[MemorialProfileForm] Form submitted successfully');
-      toast.success(profile ? 'Memorial updated successfully' : 'Memorial created successfully');
-      setHasUnsavedChanges(false);
+
+      await onSubmit(submitDataRecord as MemorialProfileFormData);
+      
+      setFormState(prev => ({ 
+        ...prev, 
+        isSaving: false,
+        hasUnsavedChanges: false,
+        lastSaved: new Date()
+      }));
+
+      if (status === 'published') {
+        toast.success('Memorial published successfully');
+      } else {
+        toast.success('Draft saved successfully');
+      }
+
+      // Redirect to the university admin management page
+      window.location.href = `/admin/universities/${formData.universityId}/profiles`;
     } catch (error) {
-      console.error('[MemorialProfileForm] Error saving memorial:', error);
-      toast.error('Failed to save memorial');
-    } finally {
-      setLoading(false);
+      console.error('[MemorialProfileForm] Error submitting form:', error);
+      setFormState(prev => ({ 
+        ...prev, 
+        isSaving: false,
+        lastSaveError: 'Failed to save changes'
+      }));
+      toast.error('Failed to save changes');
     }
   };
 
-  const handleSaveDraft = async () => {
-    console.log('[MemorialProfileForm] Saving draft', {
+  // Handle cancel
+  const handleCancel = async () => {
+    console.log('[MemorialProfileForm] Canceling form', {
+      hasUnsavedChanges: formState.hasUnsavedChanges,
       name: formData.name,
-      dateOfBirth: formData.basicInfo?.dateOfBirth,
-      completionPercentage
+      dateOfBirth: formData.basicInfo?.dateOfBirth
     });
-    setLoading(true);
-    try {
-      const metadata = {
-        tags: formData.metadata?.tags || [],
-        categories: formData.metadata?.categories || [],
-        lastModifiedBy: formData.metadata?.lastModifiedBy || '',
-        lastModifiedAt: Timestamp.fromDate(new Date()),
-        version: (formData.metadata?.version || 0) + 1
-      };
-      await onSubmit({
-        ...formData,
-        status: 'draft',
-        metadata
-      });
-      console.log('[MemorialProfileForm] Draft saved successfully');
-      toast.success('Draft saved successfully');
-      setHasUnsavedChanges(false);
-    } catch (error) {
-      console.error('[MemorialProfileForm] Error saving draft:', error);
-      toast.error('Failed to save draft');
-    } finally {
-      setLoading(false);
+    
+    if (formState.hasUnsavedChanges) {
+      if (window.confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+        await releaseLock();
+        onCancel();
+      }
+    } else {
+      await releaseLock();
+      onCancel();
     }
   };
 
@@ -328,46 +475,27 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
     }));
   };
 
-  const handleCancel = () => {
-    console.log('[MemorialProfileForm] Canceling form', {
-      hasUnsavedChanges,
-      name: formData.name,
-      dateOfBirth: formData.basicInfo?.dateOfBirth
-    });
-    if (hasUnsavedChanges) {
-      if (window.confirm('You have unsaved changes. Are you sure you want to cancel?')) {
-        onCancel();
-      }
-    } else {
-      onCancel();
-    }
-  };
-
-  const handleTimelineUpdate = async (updatedEvents: LifeEvent[]) => {
+  // Update timeline handler with memoization
+  const handleTimelineUpdate = useCallback((updatedEvents: LifeEvent[]) => {
     console.log('[MemorialProfileForm] Timeline update:', {
       eventCount: updatedEvents.length,
       firstEvent: updatedEvents[0]?.title,
       lastEvent: updatedEvents[updatedEvents.length - 1]?.title
     });
-    try {
-      const updatedData = {
-        ...formData,
-        timeline: updatedEvents.map(event => ({
-          ...event,
-          createdAt: event.createdAt || new Date(),
-          updatedAt: new Date()
-        })),
-        updatedAt: Timestamp.now()
-      };
-      console.log('[MemorialProfileForm] Saving timeline data');
-      await onSubmit(updatedData);
-      console.log('[MemorialProfileForm] Timeline saved successfully');
-      toast.success('Timeline updated successfully');
-    } catch (error) {
-      console.error('[MemorialProfileForm] Error updating timeline:', error);
-      toast.error('Failed to update timeline');
-    }
-  };
+    
+    const updatedData = {
+      ...formData,
+      timeline: updatedEvents.map(event => ({
+        ...event,
+        createdAt: event.createdAt || new Date(),
+        updatedAt: new Date()
+      })),
+      updatedAt: Timestamp.now()
+    };
+    
+    // Update form data which will trigger the debounced save
+    updateFormData(updatedData);
+  }, [formData, updateFormData]);
 
   useEffect(() => {
     console.log('[MemorialProfileForm] Timeline data updated:', {
@@ -375,6 +503,38 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
       profileTimelineLength: profile?.timeline?.length || 0
     });
   }, [formData.timeline, profile?.timeline]);
+
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      debouncedSave.cancel();
+    };
+  }, [debouncedSave]);
+
+  // Add a memoized handler for life story updates
+  const handleLifeStoryChange = useCallback((content: string) => {
+    if (formState.isSaving) return;
+    
+    updateFormData({
+      lifeStory: {
+        ...formData.lifeStory,
+        content,
+        updatedAt: new Date(),
+      },
+    });
+  }, [formData.lifeStory, formState.isSaving, updateFormData]);
+
+  // Show lock error if present
+  if (lockError) {
+    return (
+      <div className="p-6 bg-red-50 rounded-lg">
+        <div className="flex items-center">
+          <Icon name="alert-circle" className="h-5 w-5 text-red-400 mr-2" />
+          <p className="text-red-700">{lockError}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -394,11 +554,19 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
               Honor and remember someone special by creating a lasting memorial.
             </p>
           </div>
-          {lastSaved && (
-            <div className="text-sm text-indigo-100">
-              Last saved: {lastSaved.toLocaleTimeString()}
-            </div>
-          )}
+          <div className="text-sm text-indigo-100">
+            {formState.isSaving ? (
+              <span className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Saving...
+              </span>
+            ) : formState.lastSaved ? (
+              <span>Last saved: {formState.lastSaved.toLocaleTimeString()}</span>
+            ) : null}
+            {formState.lastSaveError && (
+              <span className="text-red-200 ml-2">{formState.lastSaveError}</span>
+            )}
+          </div>
         </div>
         <div className="mt-4">
           <div className="flex items-center justify-between">
@@ -414,26 +582,26 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <TabsRoot value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-6">
+        <TabsRoot value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="grid grid-cols-5 gap-4 bg-gray-50 p-1 rounded-lg">
-            <TabsTrigger value="basic" className="flex items-center gap-2">
+            <TabsTrigger value="basic" disabled={formState.isTabChanging} className="flex items-center gap-2">
               <Icon name="user" className="w-4 h-4" />
               Basic Info
             </TabsTrigger>
-            <TabsTrigger value="life" className="flex items-center gap-2">
+            <TabsTrigger value="life" disabled={formState.isTabChanging} className="flex items-center gap-2">
               <Icon name="book" className="w-4 h-4" />
               Life Story
             </TabsTrigger>
-            <TabsTrigger value="timeline" className="flex items-center gap-2">
+            <TabsTrigger value="timeline" disabled={formState.isTabChanging} className="flex items-center gap-2">
               <Icon name="clock" className="w-4 h-4" />
               Timeline
             </TabsTrigger>
-            <TabsTrigger value="media" className="flex items-center gap-2">
+            <TabsTrigger value="media" disabled={formState.isTabChanging} className="flex items-center gap-2">
               <Icon name="image" className="w-4 h-4" />
               Media
             </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
+            <TabsTrigger value="settings" disabled={formState.isTabChanging} className="flex items-center gap-2">
               <Icon name="settings" className="w-4 h-4" />
               Settings
             </TabsTrigger>
@@ -489,16 +657,20 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
                     type="date"
                     value={formatDate(formData.basicInfo?.dateOfBirth)}
                     onChange={(e) => {
-                      const date = e.target.value ? new Date(e.target.value) : null;
-                      if (date && !isNaN(date.getTime())) {
-                        updateFormData({
-                          basicInfo: {
-                            ...formData.basicInfo!,
-                            dateOfBirth: date
-                          }
-                        });
+                      const value = e.target.value;
+                      if (!value || validateDateInput(value)) {
+                        const date = value ? new Date(value) : null;
+                        if (!date || !isNaN(date.getTime())) {
+                          updateFormData({
+                            basicInfo: {
+                              ...formData.basicInfo!,
+                              dateOfBirth: date
+                            }
+                          });
+                        }
                       }
                     }}
+                    max={new Date().toISOString().split('T')[0]}
                     className={`mt-1 ${errors.dateOfBirth ? 'border-red-500' : ''}`}
                   />
                   {errors.dateOfBirth && (
@@ -515,16 +687,21 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
                     type="date"
                     value={formatDate(formData.basicInfo?.dateOfDeath)}
                     onChange={(e) => {
-                      const date = e.target.value ? new Date(e.target.value) : null;
-                      if (date && !isNaN(date.getTime())) {
-                        updateFormData({
-                          basicInfo: {
-                            ...formData.basicInfo!,
-                            dateOfDeath: date
-                          }
-                        });
+                      const value = e.target.value;
+                      if (!value || validateDateInput(value)) {
+                        const date = value ? new Date(value) : null;
+                        if (!date || !isNaN(date.getTime())) {
+                          updateFormData({
+                            basicInfo: {
+                              ...formData.basicInfo!,
+                              dateOfDeath: date
+                            }
+                          });
+                        }
                       }
                     }}
+                    min={formData.basicInfo?.dateOfBirth ? formatDate(formData.basicInfo.dateOfBirth) : undefined}
+                    max={new Date().toISOString().split('T')[0]}
                     className={`mt-1 ${errors.dateOfDeath ? 'border-red-500' : ''}`}
                   />
                   {errors.dateOfDeath && (
@@ -591,13 +768,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
               <div className="space-y-6">
                 <LifeStoryEditor
                   value={formData.lifeStory?.content || ''}
-                  onChange={(content) => updateFormData({
-                    lifeStory: {
-                      ...formData.lifeStory,
-                      content,
-                      updatedAt: new Date(),
-                    },
-                  })}
+                  onChange={handleLifeStoryChange}
                 />
                 {errors.lifeStory && (
                   <p className="mt-1 text-sm text-red-600">{errors.lifeStory}</p>
@@ -691,48 +862,39 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
           </TabsContent>
         </TabsRoot>
 
-        {/* Footer with save buttons */}
-        <div className="flex items-center justify-between pt-6 border-t">
+        {/* Form Actions */}
+        <div className="flex justify-between items-center pt-6 border-t border-gray-200">
           <div className="flex items-center gap-4">
             <Button
               type="button"
               variant="outline"
               onClick={handleCancel}
-              disabled={loading}
+              disabled={formState.isSaving}
             >
               Cancel
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleSaveDraft}
-              disabled={loading}
-            >
-              Save as Draft
-            </Button>
           </div>
           <div className="flex items-center gap-4">
-            {hasUnsavedChanges && (
+            {formState.hasUnsavedChanges && (
               <span className="text-sm text-gray-500">
                 You have unsaved changes
               </span>
             )}
             <Button
-              type="submit"
-              disabled={loading || completionPercentage < 100 || Object.keys(errors).length > 0}
-              className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+              type="button"
+              variant="outline"
+              onClick={() => handleSubmit('draft')}
+              disabled={formState.isSaving}
             >
-              {loading ? (
-                <div className="flex items-center gap-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Publishing...
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <Icon name="check" className="w-4 h-4" />
-                  Publish Memorial
-                </div>
-              )}
+              {formState.isSaving ? 'Saving...' : 'Save as Draft'}
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => handleSubmit('published')}
+              disabled={formState.isSaving || !validateForm(formData)}
+            >
+              {formState.isSaving ? 'Publishing...' : 'Publish Memorial'}
             </Button>
           </div>
         </div>

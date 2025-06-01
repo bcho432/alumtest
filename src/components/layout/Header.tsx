@@ -30,7 +30,7 @@ export function Header() {
   ];
 
   return (
-    <header className="bg-white shadow-lg sticky top-0 z-50">
+    <div className="bg-white shadow-lg sticky top-0 z-50">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center">
@@ -42,17 +42,17 @@ export function Header() {
             </Link>
             <nav className="ml-10 hidden space-x-8 md:flex">
               {navigation.map((item) => (
-              <Link 
+                <Link 
                   key={item.name}
                   href={item.href}
-                className={`px-3 py-2 text-sm font-medium transition-all ${
+                  className={`px-3 py-2 text-sm font-medium transition-all ${
                     isActive(item.href) 
-                    ? 'text-indigo-600 border-b-2 border-indigo-600' 
-                    : 'text-gray-500 hover:text-gray-900 hover:border-b-2 hover:border-gray-300'
-                }`}
-              >
+                      ? 'text-indigo-600 border-b-2 border-indigo-600' 
+                      : 'text-gray-500 hover:text-gray-900 hover:border-b-2 hover:border-gray-300'
+                  }`}
+                >
                   {item.name}
-              </Link>
+                </Link>
               ))}
             </nav>
           </div>
@@ -71,7 +71,7 @@ export function Header() {
                 </Link>
                 
                 <div className="relative">
-                <Link
+                  <Link
                     href="/profile" 
                     className="flex items-center space-x-2 text-gray-700 hover:text-gray-900"
                   >
@@ -81,7 +81,7 @@ export function Header() {
                       </span>
                     </div>
                     <span className="text-sm font-medium">{user?.displayName || user?.email}</span>
-                </Link>
+                  </Link>
                 </div>
               </div>
             ) : (
@@ -119,17 +119,17 @@ export function Header() {
       <div className={`${mobileMenuOpen ? 'block' : 'hidden'} md:hidden`}>
         <div className="space-y-1 px-2 pb-3 pt-2">
           {navigation.map((item) => (
-          <Link 
+            <Link 
               key={item.name}
               href={item.href}
               className={`block rounded-md px-3 py-2 text-base font-medium ${
                 isActive(item.href)
                   ? 'bg-indigo-50 text-indigo-600'
                   : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-            }`}
-          >
+              }`}
+            >
               {item.name}
-          </Link>
+            </Link>
           ))}
         </div>
         {user && (
@@ -148,9 +148,9 @@ export function Header() {
                   </div>
                 )}
               </div>
-                <div className="ml-3">
-                  <div className="text-base font-medium text-gray-800">
-                    {user.displayName || 'User'}
+              <div className="ml-3">
+                <div className="text-base font-medium text-gray-800">
+                  {user.displayName || 'User'}
                 </div>
                 <div className="text-sm font-medium text-gray-500">{user.email}</div>
               </div>
@@ -175,12 +175,12 @@ export function Header() {
                 Settings
               </Link>
               {isAdmin && (
-              <Link
-                href="/profiles/new"
+                <Link
+                  href="/profiles/new"
                   className="block px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-              >
-                New Profile
-              </Link>
+                >
+                  New Profile
+                </Link>
               )}
               <button
                 onClick={() => signOut()}
@@ -189,9 +189,9 @@ export function Header() {
                 Sign out
               </button>
             </div>
-            </div>
-          )}
+          </div>
+        )}
       </div>
-    </header>
+    </div>
   );
 } 

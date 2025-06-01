@@ -12,48 +12,41 @@ import type { Comment } from '@/types/comments';
 
 interface CommentsSectionProps {
   profileId: string;
-  contentId: string;
+  comments: Comment[];
+  onAddComment: (comments: Comment[]) => void;
   className?: string;
 }
 
-export function CommentsSection({ profileId, contentId, className }: CommentsSectionProps) {
+export function CommentsSection({ profileId, comments, onAddComment, className }: CommentsSectionProps) {
   const { user } = useAuth();
   const { roles, isLoading: rolesLoading } = useUserRoles();
-  const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!contentId) return;
+    if (!profileId) return;
     if (!db) {
       toast.error('Database not initialized');
       setIsLoading(false);
       return;
     }
     const q = query(
-      collection(db, 'profiles', profileId, 'content', contentId, 'comments'),
+      collection(db, 'profiles', profileId, 'content', 'comments'),
       orderBy('createdAt', 'desc')
     );
 
-    const unsubscribe = onSnapshot(q, 
-      (snapshot) => {
-        const commentsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Comment[];
-        setComments(commentsData);
-        setIsLoading(false);
-      },
-      (error) => {
-        console.error('Error fetching comments:', error);
-        toast.error('Failed to load comments');
-        setIsLoading(false);
-      }
-    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const loadedComments = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Comment[];
+      onAddComment(loadedComments);
+      setIsLoading(false);
+    });
 
     return () => unsubscribe();
-  }, [profileId, contentId]);
+  }, [profileId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,7 +58,7 @@ export function CommentsSection({ profileId, contentId, className }: CommentsSec
 
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, 'profiles', profileId, 'content', contentId, 'comments'), {
+      await addDoc(collection(db, 'profiles', profileId, 'content', 'comments'), {
         content: newComment.trim(),
         userId: user.uid,
         userEmail: user.email,
@@ -91,7 +84,7 @@ export function CommentsSection({ profileId, contentId, className }: CommentsSec
     }
 
     try {
-      await deleteDoc(doc(db, 'profiles', profileId, 'content', contentId, 'comments', commentId));
+      await deleteDoc(doc(db, 'profiles', profileId, 'content', 'comments', commentId));
       toast.success('Comment deleted successfully');
     } catch (error) {
       console.error('Error deleting comment:', error);
@@ -107,7 +100,7 @@ export function CommentsSection({ profileId, contentId, className }: CommentsSec
     }
 
     try {
-      await updateDoc(doc(db, 'profiles', profileId, 'content', contentId, 'comments', commentId), {
+      await updateDoc(doc(db, 'profiles', profileId, 'content', 'comments', commentId), {
         content: newContent.trim(),
         updatedAt: serverTimestamp(),
         isEdited: true

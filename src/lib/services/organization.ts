@@ -24,7 +24,7 @@ export async function createOrganization(
       },
       adminIds: [userId],
       memberIds: [],
-      communityPageUrl: `/university/${userId}`,
+      communityPageUrl: `/university/${data.name.toLowerCase().replace(/\s+/g, '-')}`,
       createdAt: new Date(),
       updatedAt: new Date(),
       settings: {

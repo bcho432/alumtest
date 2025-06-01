@@ -1,9 +1,38 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from './useToast';
-import { Profile, LocalDraft } from '../types/profile';
+import { Profile, LocalDraft, Achievement } from '../types/profile';
+import { Timestamp } from 'firebase/firestore';
 
 const STORAGE_KEY_PREFIX = 'draft_profile_';
 const AUTO_SAVE_INTERVAL = 10000; // 10 seconds
+
+interface TimestampLike {
+  toDate(): Date;
+}
+
+const isTimestamp = (val: unknown): val is TimestampLike => {
+  return Boolean(val && typeof val === 'object' && 'toDate' in val && typeof (val as TimestampLike).toDate === 'function');
+};
+
+const convertToDate = (val: unknown): Date | null => {
+  if (val instanceof Date) return val;
+  if (isTimestamp(val)) return val.toDate();
+  if (typeof val === 'string') return new Date(val);
+  return null;
+};
+
+const convertToTimestamp = (val: unknown): Timestamp => {
+  const date = convertToDate(val);
+  return date ? Timestamp.fromDate(date) : Timestamp.now();
+};
+
+const getTimestamp = (val: unknown): number => {
+  if (val instanceof Date) return val.getTime();
+  if (isTimestamp(val)) return val.toDate().getTime();
+  if (typeof val === 'string') return new Date(val).getTime();
+  if (typeof val === 'number') return val;
+  return 0;
+};
 
 export const useLocalDraftSync = (profileId: string) => {
   const [hasLocalDraft, setHasLocalDraft] = useState(false);
@@ -20,12 +49,29 @@ export const useLocalDraftSync = (profileId: string) => {
       const storageKey = getStorageKey();
       const dataToStore: LocalDraft = {
         ...data,
-        createdAt: (data as any).createdAt instanceof Date ? (data as any).createdAt.toISOString() : (data as any).createdAt instanceof Object && typeof (data as any).createdAt.toDate === 'function' ? (data as any).createdAt.toDate().toISOString() : (data as any).createdAt,
-        updatedAt: (data as any).updatedAt instanceof Date ? (data as any).updatedAt.toISOString() : (data as any).updatedAt instanceof Object && typeof (data as any).updatedAt.toDate === 'function' ? (data as any).updatedAt.toDate().toISOString() : (data as any).updatedAt,
+        updatedBy: (data as any).updatedBy || '',
+        isPublic: (data as any).isPublic ?? false,
+        createdAt: convertToTimestamp((data as any).createdAt).toDate().toISOString(),
+        updatedAt: convertToTimestamp((data as any).updatedAt).toDate().toISOString(),
         metadata: {
-          ...data.metadata,
-          lastModifiedAt: (data as any).metadata?.lastModifiedAt instanceof Date ? (data as any).metadata.lastModifiedAt.toISOString() : (data as any).metadata?.lastModifiedAt instanceof Object && typeof (data as any).metadata.lastModifiedAt.toDate === 'function' ? (data as any).metadata.lastModifiedAt.toDate().toISOString() : (data as any).metadata?.lastModifiedAt,
+          tags: (data as any).metadata?.tags || [],
+          categories: (data as any).metadata?.categories || [],
+          lastModifiedBy: (data as any).metadata?.lastModifiedBy || '',
+          lastModifiedAt: convertToTimestamp((data as any).metadata?.lastModifiedAt),
+          version: (data as any).metadata?.version || 1,
         },
+        basicInfo: (data as any).basicInfo ? {
+          dateOfBirth: convertToDate((data as any).basicInfo.dateOfBirth),
+          dateOfDeath: convertToDate((data as any).basicInfo.dateOfDeath),
+          biography: (data as any).basicInfo.biography || '',
+          photo: (data as any).basicInfo.photo || '',
+          birthLocation: (data as any).basicInfo.birthLocation || '',
+          deathLocation: (data as any).basicInfo.deathLocation || '',
+        } : undefined,
+        lifeStory: (data as any).lifeStory ? {
+          content: (data as any).lifeStory.content || '',
+          updatedAt: convertToDate((data as any).lifeStory.updatedAt) || new Date(),
+        } : undefined,
         education: Array.isArray((data as any).education)
           ? (data as any).education.map((ed: any) => ({
               ...ed,
@@ -41,34 +87,11 @@ export const useLocalDraftSync = (profileId: string) => {
         achievements: Array.isArray((data as any).achievements)
           ? (data as any).achievements.map((ach: any) => ({
               ...ach,
-              date: ach.date instanceof Date ? ach.date.toISOString() : ach.date instanceof Object && typeof ach.date.toDate === 'function' ? ach.date.toDate().toISOString() : ach.date,
+              title: ach.title || '',
+              description: ach.description || '',
+              date: typeof ach.date === 'string' ? ach.date : new Date(ach.date).toISOString(),
             }))
           : [],
-        basicInfo: (data as any).basicInfo
-          ? {
-              ...((data as any).basicInfo),
-              dateOfBirth: ((data as any).basicInfo.dateOfBirth instanceof Date)
-                ? (data as any).basicInfo.dateOfBirth.toISOString()
-                : ((data as any).basicInfo.dateOfBirth instanceof Object && typeof (data as any).basicInfo.dateOfBirth.toDate === 'function')
-                  ? (data as any).basicInfo.dateOfBirth.toDate().toISOString()
-                  : (data as any).basicInfo.dateOfBirth,
-              dateOfDeath: ((data as any).basicInfo.dateOfDeath instanceof Date)
-                ? (data as any).basicInfo.dateOfDeath.toISOString()
-                : ((data as any).basicInfo.dateOfDeath instanceof Object && typeof (data as any).basicInfo.dateOfDeath.toDate === 'function')
-                  ? (data as any).basicInfo.dateOfDeath.toDate().toISOString()
-                  : (data as any).basicInfo.dateOfDeath,
-            }
-          : undefined,
-        lifeStory: (data as any).lifeStory
-          ? {
-              ...((data as any).lifeStory),
-              updatedAt: ((data as any).lifeStory.updatedAt instanceof Date)
-                ? (data as any).lifeStory.updatedAt.toISOString()
-                : ((data as any).lifeStory.updatedAt instanceof Object && typeof (data as any).lifeStory.updatedAt.toDate === 'function')
-                  ? (data as any).lifeStory.updatedAt.toDate().toISOString()
-                  : (data as any).lifeStory.updatedAt,
-            }
-          : undefined,
         lastSaved: new Date().toISOString(),
       };
       localStorage.setItem(storageKey, JSON.stringify(dataToStore));
@@ -90,6 +113,20 @@ export const useLocalDraftSync = (profileId: string) => {
       const storedData = localStorage.getItem(storageKey);
       if (storedData) {
         const parsedData = JSON.parse(storedData) as LocalDraft;
+        // Convert string dates back to Date objects
+        if (parsedData.basicInfo) {
+          parsedData.basicInfo.dateOfBirth = parsedData.basicInfo.dateOfBirth ? new Date(parsedData.basicInfo.dateOfBirth) : null;
+          parsedData.basicInfo.dateOfDeath = parsedData.basicInfo.dateOfDeath ? new Date(parsedData.basicInfo.dateOfDeath) : null;
+        }
+        if (parsedData.lifeStory) {
+          parsedData.lifeStory.updatedAt = new Date(parsedData.lifeStory.updatedAt);
+        }
+        if (parsedData.achievements) {
+          parsedData.achievements = parsedData.achievements.map(ach => ({
+            ...ach,
+            date: ach.date // Keep as string since Achievement interface expects string
+          }));
+        }
         setLocalDraft(parsedData);
         setHasLocalDraft(true);
         return parsedData;
@@ -122,20 +159,8 @@ export const useLocalDraftSync = (profileId: string) => {
   }, [getStorageKey, showToast]);
 
   const mergeDrafts = useCallback((local: LocalDraft | Profile, remote: Profile): Profile => {
-    const localTimestamp = (() => {
-      const val = 'lastSaved' in local && local.lastSaved ? local.lastSaved : local.updatedAt;
-      if (val instanceof Date) return val.getTime();
-      if (val && typeof val === 'object' && typeof val.toDate === 'function') return val.toDate().getTime();
-      if (typeof val === 'string' || typeof val === 'number') return new Date(val).getTime();
-      return 0;
-    })();
-    const remoteTimestamp = (() => {
-      const val = remote.updatedAt;
-      if (val instanceof Date) return val.getTime();
-      if (val && typeof val === 'object' && typeof val.toDate === 'function') return val.toDate().getTime();
-      if (typeof val === 'string' || typeof val === 'number') return new Date(val).getTime();
-      return 0;
-    })();
+    const localTimestamp = getTimestamp('lastSaved' in local && local.lastSaved ? local.lastSaved : local.updatedAt);
+    const remoteTimestamp = getTimestamp(remote.updatedAt);
 
     // If local is newer, merge remote into local
     if (localTimestamp > remoteTimestamp) {

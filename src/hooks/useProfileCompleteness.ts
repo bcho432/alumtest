@@ -25,20 +25,19 @@ export const useProfileCompleteness = (profileId: string) => {
         let required = 0;
 
         // Basic information
-        required += 4; // name, bio, location, interests
+        required += 4; // name, bio, photo, department
         if (profile.name) completed++;
-        if (profile.type === 'personal' && profile.bio) completed++;
-        if (profile.type === 'personal' && profile.location) completed++;
+        if (profile.bio) completed++;
+        if (profile.photoURL) completed++;
+        if (profile.department) completed++;
 
         // Contact information
-        required += 2; // email, phone
-        if (profile.type === 'personal' && profile.contact?.email) completed++;
-        if (profile.type === 'personal' && profile.contact?.phone) completed++;
+        required += 1; // universityId
+        if (profile.universityId) completed++;
 
-        // Timeline entries
-        required += 2; // education, work
-        if (profile.type === 'personal' && profile.education?.length) completed++;
-        if (profile.type === 'personal' && profile.experience?.length) completed++;
+        // Photos
+        required += 1; // photos
+        if (profile.photos?.length) completed++;
 
         setCompleteness({ required, completed });
       } catch (error) {

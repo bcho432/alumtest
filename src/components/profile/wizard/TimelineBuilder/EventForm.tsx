@@ -1,14 +1,17 @@
 import React from 'react';
-import { useForm, SubmitHandler, FieldValues } from 'react-hook-form';
+import { useForm, SubmitHandler, FieldValues, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { LifeEvent } from '@/types/profile';
+import { Input } from '@/components/ui/Input';
 
 const eventSchema = z.object({
   type: z.enum(['education', 'work', 'other']),
   title: z.string().min(1, 'Title is required'),
+  company: z.string().optional(),
+  position: z.string().optional(),
   description: z.string().optional(),
   startDate: z.string().min(1, 'Start date is required'),
   endDate: z.string().optional(),
@@ -39,6 +42,7 @@ export const EventForm: React.FC<EventFormProps> = ({
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
@@ -51,6 +55,8 @@ export const EventForm: React.FC<EventFormProps> = ({
       location: initialData?.location || ''
     },
   });
+
+  const eventType = watch('type');
 
   const onSubmitHandler: SubmitHandler<FieldValues> = (data) => {
     const eventData = data as Omit<LifeEvent, 'id'>;
@@ -75,20 +81,51 @@ export const EventForm: React.FC<EventFormProps> = ({
           </select>
         </div>
 
-        <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-            Title *
-          </label>
-          <input
-            type="text"
-            id="title"
-            {...register('title')}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          />
-          {errors.title && (
-            <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>
-          )}
-        </div>
+        {eventType === 'work' ? (
+          <>
+            <div>
+              <label htmlFor="company" className="block text-sm font-medium text-gray-700">
+                Company *
+              </label>
+              <Input
+                id="company"
+                {...register('company', { required: 'Company is required' })}
+                className="mt-1"
+              />
+              {errors.company && (
+                <p className="mt-1 text-sm text-red-600">{errors.company.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="position" className="block text-sm font-medium text-gray-700">
+                Position *
+              </label>
+              <Input
+                id="position"
+                {...register('position', { required: 'Position is required' })}
+                className="mt-1"
+              />
+              {errors.position && (
+                <p className="mt-1 text-sm text-red-600">{errors.position.message}</p>
+              )}
+            </div>
+          </>
+        ) : (
+          <div>
+            <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+              Title *
+            </label>
+            <Input
+              id="title"
+              {...register('title')}
+              className="mt-1"
+            />
+            {errors.title && (
+              <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>
+            )}
+          </div>
+        )}
 
         <div>
           <label htmlFor="description" className="block text-sm font-medium text-gray-700">
@@ -132,6 +169,17 @@ export const EventForm: React.FC<EventFormProps> = ({
               <p className="mt-1 text-sm text-red-600">{errors.endDate.message}</p>
             )}
           </div>
+        </div>
+
+        <div>
+          <label htmlFor="location" className="block text-sm font-medium text-gray-700">
+            Location
+          </label>
+          <Input
+            id="location"
+            {...register('location')}
+            className="mt-1"
+          />
         </div>
 
         <div className="flex justify-end space-x-2">

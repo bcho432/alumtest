@@ -17,17 +17,10 @@ import type { University } from '@/types/university';
 import { toast } from 'react-hot-toast';
 import { Timestamp } from 'firebase/firestore';
 import { TimelineView } from '@/components/timeline/TimelineView';
-
-interface Memorial {
-  id: string;
-  title: string;
-  description: string;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string;
-  createdByName: string;
-  isPublic: boolean;
-}
+import Link from 'next/link';
+import type { Memorial } from '@/types/memorial';
+import type { MemorialPreview } from '@/types/memorial';
+import { memorialToPreview } from '@/types/memorial';
 
 interface Education {
   institution: string;
@@ -155,47 +148,87 @@ export default function ProfilePage() {
   const { id } = useParams();
   const router = useRouter();
   const { user } = useAuth();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [university, setUniversity] = useState<University | null>(null);
-  const [memorials, setMemorials] = useState<Memorial[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<PersonalProfile | MemorialProfile | null>(null);
+  const [university, setUniversity] = useState<University | null>(null);
+  const [memorials, setMemorials] = useState<MemorialPreview[]>([]);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authAction, setAuthAction] = useState<'view' | 'edit' | 'comment'>('view');
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const loadProfile = async () => {
       try {
-        const { db } = await getFirebaseServices();
-        const profileRef = doc(db, 'profiles', id as string);
-        const profileDoc = await getDoc(profileRef);
-
-        if (profileDoc.exists()) {
-          const profileData = profileDoc.data() as Profile;
-          setProfile(profileData);
-
-          // Load university data if available
-          if (profileData.type === 'memorial' && (profileData as MemorialProfile).universityId) {
-            const universityDoc = await getDoc(doc(db, 'universities', (profileData as MemorialProfile).universityId));
-
-            if (universityDoc.exists()) {
-              setUniversity({ id: universityDoc.id, ...universityDoc.data() } as University);
-            }
+        console.log('Loading profile data for ID:', id);
+        const services = await getFirebaseServices();
+        
+        // First try loading from the university-specific collection
+        const universityId = id.split('/')[0];
+        const profileId = id.split('/').pop();
+        
+        if (universityId && profileId) {
+          console.log('Loading from university collection:', universityId, profileId);
+          const profileRef = doc(services.db, `universities/${universityId}/profiles`, profileId);
+          const profileDoc = await getDoc(profileRef);
+          
+          if (profileDoc.exists()) {
+            const profileData = {
+              id: profileDoc.id,
+              ...profileDoc.data()
+            } as any;
+            
+            console.log('Found profile in university collection:', profileData);
+            setProfile(profileData);
+            setLoading(false);
+            return;
           }
-        } else {
-          toast.error('Profile not found');
-          router.push('/dashboard');
         }
+        
+        // If not found in university collection, try the global profiles collection
+        console.log('Trying global profiles collection');
+        const profileRef = doc(services.db, 'profiles', id);
+        const profileDoc = await getDoc(profileRef);
+        
+        if (!profileDoc.exists()) {
+          console.error('Profile not found:', id);
+          setError('Profile not found');
+          setLoading(false);
+          return;
+        }
+
+        const profileData = {
+          id: profileDoc.id,
+          ...profileDoc.data()
+        } as any;
+
+        console.log('Found profile in global collection:', profileData);
+        setProfile(profileData);
+        
+        // If this is a memorial profile, load the university data
+        if (profileData.type === 'memorial' && profileData.universityId) {
+          const universityRef = doc(services.db, 'universities', profileData.universityId);
+          const universityDoc = await getDoc(universityRef);
+          
+          if (universityDoc.exists()) {
+            setUniversity({
+              id: universityDoc.id,
+              ...universityDoc.data()
+            } as University);
+          }
+        }
+        
+        setLoading(false);
       } catch (error) {
-        console.error('Error fetching profile:', error);
-        toast.error('Failed to load profile');
-      } finally {
+        console.error('Error loading profile:', error);
+        setError('Error loading profile');
         setLoading(false);
       }
     };
 
-    fetchProfile();
-  }, [id, router]);
+    if (id) {
+      loadProfile();
+    }
+  }, [id]);
 
   const handleAuthRequired = (action: 'view' | 'edit' | 'comment') => {
     setAuthAction(action);
@@ -230,13 +263,19 @@ export default function ProfilePage() {
   };
 
   const handleEdit = () => {
-    router.push(`/profile/${id}/edit`);
+    if (!profile) return;
+    
+    if (profile.type === 'memorial' && (profile as MemorialProfile).universityId) {
+      router.push(`/admin/universities/${(profile as MemorialProfile).universityId}/profiles/${id}/edit`);
+    } else {
+      router.push(`/profile/${id}/edit`);
+    }
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Icon name="loading" className="animate-spin h-8 w-8 text-indigo-600" />
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -245,7 +284,7 @@ export default function ProfilePage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <Icon name="alert-circle" className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <Icon name="exclamation-circle" className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
           <p className="text-gray-600">{error || 'Profile not found'}</p>
         </div>
@@ -254,50 +293,103 @@ export default function ProfilePage() {
   }
 
   const isPersonalProfile = profile.type === 'personal';
-  const personal = isPersonalProfile ? (profile as PersonalProfile) : undefined;
+  const personal = isPersonalProfile ? {
+    ...profile,
+    type: 'personal' as const,
+    bio: profile.bio || '',
+    photoURL: profile.photoURL || '',
+    location: profile.location || '',
+    department: profile.department || '',
+    graduationYear: profile.graduationYear || '',
+    contact: profile.contact || { email: '', phone: '', website: '' },
+    education: profile.education || [],
+    experience: profile.experience || [],
+    achievements: profile.achievements || []
+  } as PersonalProfile : undefined;
+  const memorial = !isPersonalProfile ? {
+    ...profile,
+    type: 'memorial' as const,
+    basicInfo: profile.basicInfo || {
+      dateOfBirth: null,
+      dateOfDeath: null,
+      biography: '',
+      photo: '',
+      birthLocation: '',
+      deathLocation: ''
+    },
+    lifeStory: profile.lifeStory || { content: '', updatedAt: new Date() },
+    timeline: profile.timeline || []
+  } as MemorialProfile : undefined;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-gradient-primary text-white">
-        <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-12">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      {/* Hero Section with Cover Photo */}
+      <div className="relative bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+        <div className="absolute inset-0 bg-black opacity-20"></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+          <div className="flex flex-col md:flex-row items-center gap-8">
             {/* Profile Photo */}
-            <div className="bg-white shadow rounded-lg p-6">
-              <div className="relative mb-6">
-                {profile.type === 'personal' && (profile as PersonalProfile).photoURL ? (
-                  <img
-                    src={(profile as PersonalProfile).photoURL}
-                    alt={profile.name}
-                    className="w-32 h-32 rounded-full object-cover mx-auto border-4 border-white shadow"
-                  />
-                ) : profile.type === 'memorial' && (profile as MemorialProfile).imageUrl ? (
-                  <img
-                    src={(profile as MemorialProfile).imageUrl}
-                    alt={profile.name}
-                    className="w-32 h-32 rounded-full object-cover mx-auto border-4 border-white shadow"
-                  />
-                ) : null}
-              </div>
+            <div className="w-40 h-40 flex-shrink-0 bg-white rounded-2xl p-4 shadow-xl">
+              {isPersonalProfile ? (
+                <img
+                  src={personal?.photoURL || '/default-avatar.png'}
+                  alt={profile.name}
+                  className="w-full h-full object-cover rounded-xl"
+                />
+              ) : memorial?.basicInfo?.photo ? (
+                <img
+                  src={memorial.basicInfo.photo}
+                  alt={profile.name}
+                  className="w-full h-full object-cover rounded-xl"
+                />
+              ) : (
+                <div className="w-full h-full bg-indigo-100 rounded-xl flex items-center justify-center">
+                  <Icon name="user" className="h-16 w-16 text-indigo-600" />
+                </div>
+              )}
             </div>
+            
             {/* Profile Info */}
-            <div className="text-center md:text-left">
-              <h1 className="text-3xl font-bold">{profile.name}</h1>
-              {/* Only render department and bio for PersonalProfile */}
-              {isPersonalProfile && personal && personal.department && (
-                <p className="mt-1 text-indigo-200">{personal.department}</p>
+            <div className="flex-1 text-center md:text-left">
+              <h1 className="text-5xl font-bold mb-4">{profile.name}</h1>
+              {isPersonalProfile ? (
+                <div className="space-y-2">
+                  {personal?.department && (
+                    <p className="text-xl text-indigo-100">{personal.department}</p>
+                  )}
+                  {personal?.location && (
+                    <p className="text-lg text-indigo-100 flex items-center justify-center md:justify-start gap-2">
+                      <Icon name="map-pin" className="h-5 w-5" />
+                      {personal.location}
+                    </p>
+                  )}
+                  {personal?.graduationYear && (
+                    <p className="text-lg text-indigo-100">Class of {personal.graduationYear}</p>
+                  )}
+                </div>
+              ) : (
+                <div className="text-gray-100 text-xl space-y-2">
+                  <p className="flex items-center justify-center md:justify-start gap-2">
+                    <Icon name="calendar" className="h-5 w-5" />
+                    Born: {formatDate(memorial?.basicInfo?.dateOfBirth)}
+                  </p>
+                  <p className="flex items-center justify-center md:justify-start gap-2">
+                    <Icon name="calendar" className="h-5 w-5" />
+                    Died: {formatDate(memorial?.basicInfo?.dateOfDeath)}
+                  </p>
+                </div>
               )}
-              {isPersonalProfile && personal && personal.bio && (
-                <p className="mt-2 text-indigo-100">{personal.bio}</p>
-              )}
-              <div className="mt-6 flex flex-wrap items-center justify-center md:justify-start gap-4">
-                <ShareButton profileId={profile.id} />
-                <PinButton profileId={profile.id} />
+              
+              {/* Action Buttons */}
+              <div className="flex flex-wrap gap-4 justify-center md:justify-start mt-6">
+                <ShareButton url={`/profile/${id}`} />
+                <PinButton profileId={id as string} />
                 <RoleBasedUI allowedRoles={['admin', 'editor']}>
                   <button
                     onClick={handleEdit}
-                    className="inline-flex items-center px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg text-sm font-medium transition-colors duration-200"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full font-medium transition-colors"
                   >
-                    <Icon name="edit" className="mr-2 h-4 w-4" />
+                    <Icon name="edit" className="h-5 w-5" />
                     Edit Profile
                   </button>
                 </RoleBasedUI>
@@ -307,121 +399,164 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column */}
           <div className="lg:col-span-2 space-y-8">
             {/* About Section */}
-            <div className="bg-white shadow rounded-lg p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">About</h2>
+            <div className="bg-white rounded-2xl shadow-lg p-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">About</h2>
               <div className="prose max-w-none">
                 {isPersonalProfile ? (
                   <div className="space-y-6">
-                    {personal?.location && (
+                    {personal?.bio && (
                       <div>
-                        <h2 className="text-lg font-medium text-gray-900">Location</h2>
-                        <p className="mt-2 text-gray-600">{personal.location}</p>
+                        <h3 className="text-lg font-medium text-gray-900">Biography</h3>
+                        <p className="mt-2 text-gray-600 whitespace-pre-wrap">{personal.bio}</p>
                       </div>
                     )}
-                    {personal?.contact?.email && (
+                    {personal?.contact && (
                       <div>
-                        <h2 className="text-lg font-medium text-gray-900">Contact</h2>
-                        <p className="mt-2 text-gray-600">{personal.contact.email}</p>
-                      </div>
-                    )}
-                    {personal?.graduationYear && (
-                      <div>
-                        <h2 className="text-lg font-medium text-gray-900">Graduation Year</h2>
-                        <p className="mt-2 text-gray-600">{personal.graduationYear}</p>
+                        <h3 className="text-lg font-medium text-gray-900">Contact Information</h3>
+                        <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+                          {personal.contact.email && (
+                            <div>
+                              <dt className="text-sm font-medium text-gray-500">Email</dt>
+                              <dd className="mt-1 text-sm text-gray-900">{personal.contact.email}</dd>
+                            </div>
+                          )}
+                          {personal.contact.phone && (
+                            <div>
+                              <dt className="text-sm font-medium text-gray-500">Phone</dt>
+                              <dd className="mt-1 text-sm text-gray-900">{personal.contact.phone}</dd>
+                            </div>
+                          )}
+                          {personal.contact.website && (
+                            <div>
+                              <dt className="text-sm font-medium text-gray-500">Website</dt>
+                              <dd className="mt-1 text-sm text-gray-900">
+                                <a href={personal.contact.website} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-500">
+                                  {personal.contact.website}
+                                </a>
+                              </dd>
+                            </div>
+                          )}
+                        </dl>
                       </div>
                     )}
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    <div>
-                      <h2 className="text-lg font-medium text-gray-900">Description</h2>
-                      <p className="mt-2 text-gray-600">{(profile as MemorialProfile).description}</p>
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-medium text-gray-900">Life Story</h2>
-                      <div className="mt-2 text-gray-600">
-                        {(() => {
-                          try {
-                            const lifeStoryContent = JSON.parse((profile as MemorialProfile).lifeStory.content) as Record<string, string>;
-                            return Object.entries(lifeStoryContent).map(([question, answer]) => (
-                              <div key={question} className="mb-4">
-                                <h3 className="font-medium text-gray-900">{question}</h3>
-                                <p className="mt-1">{answer}</p>
-                              </div>
-                            ));
-                          } catch (error) {
-                            console.error('Error parsing life story content:', error);
-                            return <p>{(profile as MemorialProfile).lifeStory.content}</p>;
-                          }
-                        })()}
+                    {memorial?.description && (
+                      <div>
+                        <h3 className="text-lg font-medium text-gray-900">Description</h3>
+                        <p className="mt-2 text-gray-600">{memorial.description}</p>
                       </div>
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-medium text-gray-900">Basic Information</h2>
-                      <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
-                        <div>
-                          <dt className="text-sm font-medium text-gray-500">Date of Birth</dt>
-                          <dd className="mt-1 text-sm text-gray-900">
-                            {formatDate((profile as MemorialProfile).basicInfo?.dateOfBirth)}
-                          </dd>
+                    )}
+                    {memorial?.lifeStory?.content && (
+                      <div>
+                        <h3 className="text-lg font-medium text-gray-900">Life Story</h3>
+                        <div className="mt-2 text-gray-600">
+                          {(() => {
+                            try {
+                              const lifeStoryContent = JSON.parse(memorial.lifeStory.content) as Record<string, string>;
+                              return Object.entries(lifeStoryContent).map(([question, answer]) => (
+                                <div key={question} className="mb-4">
+                                  <h4 className="font-medium text-gray-900">{question}</h4>
+                                  <p className="mt-1 text-gray-600">{answer}</p>
+                                </div>
+                              ));
+                            } catch (error) {
+                              console.error('Error parsing life story:', error);
+                              return <p className="text-gray-600">{memorial.lifeStory.content}</p>;
+                            }
+                          })()}
                         </div>
-                        <div>
-                          <dt className="text-sm font-medium text-gray-500">Date of Death</dt>
-                          <dd className="mt-1 text-sm text-gray-900">
-                            {formatDate((profile as MemorialProfile).basicInfo?.dateOfDeath)}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-sm font-medium text-gray-500">Birth Location</dt>
-                          <dd className="mt-1 text-sm text-gray-900">
-                            {(profile as MemorialProfile).basicInfo.birthLocation}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-sm font-medium text-gray-500">Death Location</dt>
-                          <dd className="mt-1 text-sm text-gray-900">
-                            {(profile as MemorialProfile).basicInfo.deathLocation}
-                          </dd>
-                        </div>
-                      </dl>
-                    </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             </div>
 
             {/* Timeline Section */}
-            {!isPersonalProfile && (profile as MemorialProfile).timeline && (profile as MemorialProfile).timeline.length > 0 && (
-              <div className="bg-white shadow rounded-lg p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Timeline</h2>
+            {!isPersonalProfile && memorial?.timeline && memorial.timeline.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-lg p-8">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Life Timeline</h2>
                 <TimelineView
                   orgId={profile.id}
                   profileId={profile.id}
                   onEventClick={(event) => {
-                    // Handle event click if needed
                     console.log('Event clicked:', event);
                   }}
                 />
               </div>
             )}
+
+            {/* Memorials Section */}
+            {memorials.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-lg p-8">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Related Memorials</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {memorials.map((memorial) => (
+                    <Link
+                      key={memorial.id}
+                      href={`/${memorial.universityId}/memorials/${memorial.id}`}
+                      className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow border border-gray-100"
+                    >
+                      <div className="aspect-w-16 aspect-h-9 bg-gray-100">
+                        {memorial.coverImage ? (
+                          <img
+                            src={memorial.coverImage}
+                            alt={memorial.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-indigo-100">
+                            <Icon name="heart" className="h-12 w-12 text-indigo-600" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-6">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">{memorial.title}</h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                          Created {memorial.createdAt instanceof Date ? memorial.createdAt.toLocaleDateString() : new Date(memorial.createdAt.seconds * 1000).toLocaleDateString()}
+                        </p>
+                        {memorial.description && (
+                          <p className="text-gray-600 line-clamp-3">{memorial.description}</p>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Comments Section */}
+            <div className="bg-white rounded-2xl shadow-lg p-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Comments & Memories</h2>
+              <CommentsSection
+                profileId={profile.id}
+                comments={[]}
+                onAddComment={() => {}}
+              />
+            </div>
           </div>
-          {/* Right Column (optional: university info, etc.) */}
+
+          {/* Right Column */}
           <div className="space-y-8">
+            {/* University Info */}
             {university && (
-              <div className="bg-white shadow rounded-lg p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">University</h2>
-                <div className="flex items-center space-x-4">
+              <div className="bg-white rounded-2xl shadow-lg p-8">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">University</h2>
+                <div className="flex items-center gap-4">
                   {university.logoUrl && (
                     <img
                       src={university.logoUrl}
                       alt={university.name}
-                      className="h-12 w-12 rounded-full object-cover"
+                      className="h-16 w-16 rounded-xl object-cover"
                     />
                   )}
                   <div>
@@ -431,9 +566,70 @@ export default function ProfilePage() {
                 </div>
               </div>
             )}
+
+            {/* Media Gallery */}
+            {profile.type === 'memorial' && (
+              <div className="bg-white rounded-2xl shadow-lg p-8">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Photo Gallery</h2>
+                <MediaGallery
+                  profileId={id as string}
+                  files={[profile.basicInfo.photo]}
+                  onFileClick={(file) => window.open(file, '_blank')}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Auth Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                      {authAction === 'comment' ? 'Sign in to Comment' : 'Authentication Required'}
+                    </h3>
+                    <div className="mt-4">
+                      <p className="text-sm text-gray-500">
+                        {authAction === 'comment'
+                          ? 'Please sign in to leave a comment.'
+                          : 'Please sign in to access this feature.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={() => {
+                    router.push('/auth/signin');
+                    setShowAuthModal(false);
+                  }}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={() => setShowAuthModal(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -112,7 +112,7 @@ export class CommentService {
         rootComment,
         replies,
         totalReplies: replies.length,
-        lastReplyAt: replies.length > 0 ? replies[replies.length - 1].createdAt : rootComment.createdAt
+        lastReplyAt: replies.length > 0 ? replies[replies.length - 1].createdAt.toISOString() : rootComment.createdAt.toISOString()
       };
     } catch (error) {
       console.error('Error getting comment thread:', error);

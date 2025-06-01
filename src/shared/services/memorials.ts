@@ -29,15 +29,12 @@ const validateBasicInfo = (basicInfo: MemorialBasicInfo): string | null => {
   if (basicInfo.name.length > 100) {
     return 'Name must be less than 100 characters';
   }
-  if (basicInfo.birthLocation && basicInfo.birthLocation.length > 200) {
-    return 'Birth location must be less than 200 characters';
+  if (basicInfo.location && basicInfo.location.length > 200) {
+    return 'Location must be less than 200 characters';
   }
-  if (basicInfo.deathLocation && basicInfo.deathLocation.length > 200) {
-    return 'Death location must be less than 200 characters';
-  }
-  if (basicInfo.dateOfBirth && basicInfo.dateOfDeath) {
-    const birthDate = new Date(basicInfo.dateOfBirth);
-    const deathDate = new Date(basicInfo.dateOfDeath);
+  if (basicInfo.birthDate && basicInfo.deathDate) {
+    const birthDate = new Date(basicInfo.birthDate);
+    const deathDate = new Date(basicInfo.deathDate);
     if (isNaN(birthDate.getTime()) || isNaN(deathDate.getTime())) {
       return 'Invalid date format';
     }

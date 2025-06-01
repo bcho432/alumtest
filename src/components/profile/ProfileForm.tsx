@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
-import { Profile, PersonalProfile, MemorialProfile } from '@/types/profile';
+import { Profile, PersonalProfile, MemorialProfile, BaseProfile } from '@/types/profile';
 import { toast } from 'react-hot-toast';
 import { Badge } from '@/components/ui/Badge';
 import { Timestamp } from 'firebase/firestore';
@@ -23,7 +23,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
   onCancel,
   className
 }) => {
-  const [formData, setFormData] = useState<Profile>(() => {
+  const [formData, setFormData] = useState<any>(() => {
     if (profile) {
       return profile;
     }
@@ -44,8 +44,11 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
         categories: [],
         lastModifiedBy: '',
         lastModifiedAt: Timestamp.now(),
-        version: 0
+        version: 1,
       },
+      universityId: '',
+      description: '',
+      imageUrl: '',
       bio: '',
       photoURL: '',
       location: '',
@@ -54,11 +57,12 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
       contact: {
         email: '',
         phone: '',
-        website: ''
+        website: '',
       },
       education: [],
       experience: [],
-      achievements: []
+      achievements: [],
+      lifeStory: {},
     } as PersonalProfile;
   });
 
@@ -82,26 +86,26 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
 
   const handleAddTag = () => {
     if (!newTag.trim()) return;
-    if (formData.metadata?.tags?.includes(newTag.trim())) {
+    if ((formData as any).metadata?.tags?.includes(newTag.trim())) {
       toast.error('Tag already exists');
       return;
     }
-    setFormData(prev => ({
+    setFormData((prev: any) => ({
       ...prev,
       metadata: {
-        ...prev.metadata,
-        tags: [...(prev.metadata?.tags || []), newTag.trim()]
+        ...(prev as any).metadata,
+        tags: [...((prev as any).metadata?.tags || []), newTag.trim()]
       }
     }));
     setNewTag('');
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
-    setFormData(prev => ({
+    setFormData((prev: any) => ({
       ...prev,
       metadata: {
-        ...prev.metadata,
-        tags: prev.metadata?.tags?.filter(tag => tag !== tagToRemove)
+        ...(prev as any).metadata,
+        tags: (prev as any).metadata?.tags?.filter((tag: string) => tag !== tagToRemove)
       }
     }));
   };
@@ -193,7 +197,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
               </label>
               <Textarea
                 id="description"
-                value={(formData as MemorialProfile).description}
+                value={((formData as unknown) as MemorialProfile).description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 className="mt-1"
               />
@@ -269,7 +273,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
         <div>
           <label className="block text-sm font-medium text-gray-700">Tags</label>
           <div className="mt-1 flex flex-wrap gap-2">
-            {formData.metadata?.tags?.map((tag) => (
+            {formData.metadata?.tags?.map((tag: string) => (
               <Badge key={tag} variant="secondary">
                 {tag}
                 <button

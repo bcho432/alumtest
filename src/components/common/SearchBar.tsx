@@ -101,7 +101,7 @@ export function SearchBar() {
     if (result.type === 'profile') {
       router.push(`/profile/${result.id}`);
     } else {
-      router.push(`/university/${result.id}`);
+      router.push(`/university/${result.name.toLowerCase().replace(/\s+/g, '-')}`);
     }
   };
 

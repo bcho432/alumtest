@@ -117,9 +117,9 @@ export function useCreateProfile() {
           ...baseProfileData,
           type: 'personal',
           name: params.name || '',
-          bio: params.description || '',
-          photoURL: params.imageUrl || '',
-          location: params.basicInfo?.birthLocation || '',
+          bio: '',
+          photoURL: '',
+          location: '',
           department: '',
           graduationYear: '',
           contact: {
@@ -129,7 +129,16 @@ export function useCreateProfile() {
           },
           education: [],
           experience: [],
-          achievements: []
+          achievements: [],
+          description: '',
+          imageUrl: '',
+          metadata: {
+            tags: [],
+            categories: [],
+            lastModifiedBy: '',
+            lastModifiedAt: Timestamp.now(),
+            version: 1
+          }
         } as PersonalProfile;
       }
 

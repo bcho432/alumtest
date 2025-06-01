@@ -11,6 +11,14 @@ import { Icon } from '@/components/ui/Icon';
 import { Timestamp } from 'firebase/firestore';
 import { Profile, PersonalProfile, MemorialProfile } from '@/types/profile';
 
+// NOTE: TypeScript type predicates are not assignable due to structural incompatibility between Profile and MemorialProfile/PersonalProfile (createdAt/updatedAt fields).
+function isMemorialProfile(profile: Profile): boolean {
+  return profile.type === 'memorial';
+}
+function isPersonalProfile(profile: Profile): boolean {
+  return profile.type === 'personal';
+}
+
 export default function LifeStoryPage() {
   const router = useRouter();
   const { showToast } = useToast();
@@ -70,24 +78,26 @@ export default function LifeStoryPage() {
 
   const handleSave = async (responses: Record<string, string>) => {
     try {
-      let updatedProfile: Profile;
-
-      if (profile.type === 'memorial') {
-        updatedProfile = {
-          ...profile as MemorialProfile,
+      if (!profile) return;
+      if (isMemorialProfile(profile)) {
+        const updatedProfile = {
+          ...profile as unknown as MemorialProfile,
           lifeStory: {
             content: JSON.stringify(responses),
             updatedAt: Timestamp.now(),
           },
         };
-      } else {
-        updatedProfile = {
-          ...profile as PersonalProfile,
+        await updateProfile(updatedProfile as any);
+      } else if (isPersonalProfile(profile)) {
+        const personalProfile = profile as any;
+        const updatedProfile = {
+          ...personalProfile,
           lifeStory: responses,
         };
+        await updateProfile(updatedProfile);
+      } else {
+        return;
       }
-
-      await updateProfile(updatedProfile);
 
       showToast({
         title: 'Success',
@@ -114,17 +124,21 @@ export default function LifeStoryPage() {
 
   // Get initial responses based on profile type
   const getInitialResponses = () => {
-    if (!profile.lifeStory) return {};
-    
-    if (profile.type === 'memorial') {
+    if (!profile) return {};
+    if (isMemorialProfile(profile)) {
       try {
-        return JSON.parse((profile as MemorialProfile).lifeStory.content);
+        const memorialProfile = profile as any;
+        if (!memorialProfile.lifeStory || !memorialProfile.lifeStory.content) return {};
+        return JSON.parse(memorialProfile.lifeStory.content);
       } catch {
         return {};
       }
     }
-    
-    return (profile as PersonalProfile).lifeStory || {};
+    if (isPersonalProfile(profile)) {
+      const personalProfile = profile as any;
+      return personalProfile.lifeStory || {};
+    }
+    return {};
   };
 
   return (

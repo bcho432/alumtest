@@ -18,9 +18,11 @@ import { db } from '@/lib/firebase';
 interface MediaGalleryProps {
   profileId: string;
   className?: string;
+  files: string[];
+  onFileClick: (file: string) => void;
 }
 
-export function MediaGallery({ profileId, className }: MediaGalleryProps) {
+export function MediaGallery({ profileId, className, files, onFileClick }: MediaGalleryProps) {
   const { user } = useAuth();
   const { roles, isLoading: rolesLoading } = useUserRoles();
   const [folders, setFolders] = useState<MediaFolder[]>([]);

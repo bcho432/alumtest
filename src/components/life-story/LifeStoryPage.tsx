@@ -18,6 +18,13 @@ const memorialLifeStorySchema = z.object({
 
 const personalLifeStorySchema = z.record(z.string());
 
+function hasLifeStory(profile: any): profile is MemorialProfile | PersonalProfile {
+  return (
+    (profile.type === 'memorial' && 'lifeStory' in profile) ||
+    (profile.type === 'personal' && 'lifeStory' in profile)
+  );
+}
+
 export const LifeStoryPage: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -31,18 +38,20 @@ export const LifeStoryPage: React.FC = () => {
 
   // Load initial responses with validation
   useEffect(() => {
-    if (profile?.lifeStory) {
+    if (profile && hasLifeStory(profile)) {
       try {
         if (profile.type === 'memorial') {
           const memorialProfile = profile as MemorialProfile;
-          // Validate the life story structure
-          memorialLifeStorySchema.parse(memorialProfile.lifeStory);
-          const parsedResponses = JSON.parse(memorialProfile.lifeStory.content);
-          // Validate the parsed content
-          personalLifeStorySchema.parse(parsedResponses);
-          setResponses(parsedResponses);
-          setLocalResponses(parsedResponses);
-        } else {
+          if (memorialProfile.lifeStory && memorialProfile.lifeStory.content) {
+            // Validate the life story structure
+            memorialLifeStorySchema.parse(memorialProfile.lifeStory);
+            const parsedResponses = JSON.parse(memorialProfile.lifeStory.content);
+            // Validate the parsed content
+            personalLifeStorySchema.parse(parsedResponses);
+            setResponses(parsedResponses);
+            setLocalResponses(parsedResponses);
+          }
+        } else if (profile.type === 'personal') {
           const personalProfile = profile as PersonalProfile;
           // Validate the life story structure
           personalLifeStorySchema.parse(personalProfile.lifeStory || {});
@@ -91,22 +100,25 @@ export const LifeStoryPage: React.FC = () => {
       // Validate responses before saving
       personalLifeStorySchema.parse(responses);
 
-      const updatedProfile = { ...profile };
-      
+      let updatedProfile: MemorialProfile | PersonalProfile;
       if (profile.type === 'memorial') {
-        (updatedProfile as MemorialProfile).lifeStory = {
-          content: JSON.stringify(responses),
-          updatedAt: Timestamp.now()
+        updatedProfile = {
+          ...profile as unknown as MemorialProfile,
+          lifeStory: {
+            content: JSON.stringify(responses),
+            updatedAt: Timestamp.now()
+          }
         };
-        // Validate the updated profile
         memorialLifeStorySchema.parse((updatedProfile as MemorialProfile).lifeStory);
       } else {
-        (updatedProfile as PersonalProfile).lifeStory = responses;
-        // Validate the updated profile
+        updatedProfile = {
+          ...profile as unknown as PersonalProfile,
+          lifeStory: responses
+        };
         personalLifeStorySchema.parse((updatedProfile as PersonalProfile).lifeStory);
       }
 
-      await updateProfile(updatedProfile);
+      await updateProfile(updatedProfile as any);
       setRetryCount(0);
 
       showToast({

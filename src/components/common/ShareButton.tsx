@@ -4,14 +4,14 @@ import React, { useState } from 'react';
 import { Icon } from '@/components/common/Icon';
 
 interface ShareButtonProps {
-  profileId: string;
+  url: string;
 }
 
-export const ShareButton: React.FC<ShareButtonProps> = ({ profileId }) => {
+export function ShareButton({ url }: ShareButtonProps) {
   const [copied, setCopied] = useState(false);
 
   const handleShare = async () => {
-    const profileUrl = `${window.location.origin}/profile/${profileId}`;
+    const profileUrl = `${window.location.origin}/profile/${url}`;
 
     if (navigator.share) {
       try {
@@ -42,4 +42,4 @@ export const ShareButton: React.FC<ShareButtonProps> = ({ profileId }) => {
       {copied ? 'Copied!' : 'Share'}
     </button>
   );
-}; 
+} 

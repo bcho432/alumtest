@@ -122,14 +122,17 @@ export interface Video {
 
 export interface BaseProfile {
   id: string;
-  type: 'personal' | 'memorial';
-  name: string;
-  status: 'draft' | 'published';
-  isPublic: boolean;
+  type: 'personal' | 'memorial' | 'university';
+  universityId: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   createdBy: string;
   updatedBy: string;
+  name: string;
+  description: string;
+  imageUrl: string;
+  isPublic: boolean;
+  status: 'draft' | 'published' | 'pending_review';
   metadata: {
     tags: string[];
     categories: string[];
@@ -175,30 +178,44 @@ export interface PersonalProfile extends BaseProfile {
 
 export interface MemorialProfile extends BaseProfile {
   type: 'memorial';
-  universityId: string;
-  description: string;
-  imageUrl: string;
   basicInfo: {
-    dateOfBirth: Timestamp | null;
-    dateOfDeath: Timestamp | null;
+    dateOfBirth: Date | Timestamp | null;
+    dateOfDeath: Date | Timestamp | null;
     biography: string;
     photo: string;
     birthLocation: string;
     deathLocation: string;
   };
-  lifeStory: {
+  lifeStory?: {
     content: string;
-    updatedAt: Timestamp;
+    updatedAt: Date | Timestamp;
   };
   timeline: TimelineEvent[];
+  lock?: {
+    userId: string;
+    timestamp: Date;
+  };
 }
 
-export type Profile = PersonalProfile | MemorialProfile;
+export interface Profile {
+  id: string;
+  name: string;
+  type: 'personal' | 'memorial';
+  status: 'draft' | 'pending_review' | 'published';
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string;
+  universityId?: string;
+  photoURL?: string;
+  department?: string;
+  bio?: string;
+  photos?: string[];
+}
 
 export interface LocalDraft {
   id: string;
   name: string;
-  status: 'draft' | 'published';
+  status: 'draft' | 'published' | 'pending_review';
   createdAt: string;
   updatedAt: string;
   createdBy: string;

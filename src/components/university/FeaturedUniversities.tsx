@@ -119,11 +119,10 @@ export function FeaturedUniversities() {
                     <p className="text-gray-600 mb-4">{university.description}</p>
                   )}
                   <button
-                    onClick={() => router.push(`/university/${university.id}`)}
-                    className="inline-flex items-center gap-2 text-indigo-600 font-semibold hover:text-indigo-700 transition-colors"
+                    onClick={() => router.push(`/university/${university.name.toLowerCase().replace(/\s+/g, '-')}`)}
+                    className="text-indigo-600 hover:text-indigo-700 font-medium"
                   >
-                    View University
-                    <Icon name="arrow-right" className="h-4 w-4" />
+                    View Community
                   </button>
                 </div>
               </div>
