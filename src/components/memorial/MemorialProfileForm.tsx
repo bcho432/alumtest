@@ -29,6 +29,9 @@ interface MemorialProfileFormProps {
   onSubmit: (data: MemorialProfileFormData) => Promise<void>;
   onCancel: () => void;
   className?: string;
+  universityId: string;
+  memorialId: string;
+  onSuccess: () => void;
 }
 
 interface FormErrors {
@@ -56,7 +59,10 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
   profile,
   onSubmit,
   onCancel,
-  className
+  className,
+  universityId,
+  memorialId,
+  onSuccess
 }) => {
   console.log('[MemorialProfileForm] Rendering form with profile:', profile?.id || 'new');
 
