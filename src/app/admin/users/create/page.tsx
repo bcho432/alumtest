@@ -17,7 +17,7 @@ import type { User, UserRole } from '@/types/user';
 
 export default function CreateUserPage() {
   const router = useRouter();
-  const { user, userRoles, loading } = useAuth();
+  const { user, isAdmin, loading } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [userData, setUserData] = useState<Partial<User>>({
@@ -49,7 +49,7 @@ export default function CreateUserPage() {
     );
   }
 
-  if (!user || !userRoles?.isAdmin) {
+  if (!user || !isAdmin) {
     router.push('/');
     return null;
   }

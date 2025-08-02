@@ -33,11 +33,7 @@ export default function Login() {
     <div className="flex min-h-full flex-1 flex-col justify-center px-6 py-12 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-sm">
         <div className="mx-auto w-auto flex justify-center">
-<<<<<<< HEAD
-          <span className="ml-2 text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">Storiats</span>
-=======
           <span className="text-indigo-600 text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">Storiats</span>
->>>>>>> 7e9478cae498b2e850db687ac16eda423a72f541
         </div>
         <h2 className="mt-10 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900">
           Sign in to your account
