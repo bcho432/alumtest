@@ -122,7 +122,11 @@ export default function Home() {
           <TestimonialCard
             name="Sarah M."
             role="Granddaughter"
+<<<<<<< HEAD
             text="Storiats made it easy to honor my grandfather's life and share his story with our family."
+=======
+                            text="Storiats made it easy to honor my grandfather's life and share his story with our family."
+>>>>>>> 7e9478cae498b2e850db687ac16eda423a72f541
           />
           <TestimonialCard
             name="Michael R."
