@@ -12,7 +12,7 @@ const nextConfig = {
   images: {
     domains: ['firebasestorage.googleapis.com'],
   },
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, dev }) => {
     // Handle private class fields in undici
     config.module.rules.push({
       test: /\.js$/,
@@ -34,6 +34,11 @@ const nextConfig = {
         '@': require('path').resolve(__dirname, 'src'),
       },
     };
+
+    // Don't stop on first error in production builds
+    if (!dev) {
+      config.bail = false;
+    }
 
     return config;
   },

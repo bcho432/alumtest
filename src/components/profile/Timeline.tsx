@@ -39,14 +39,12 @@ export const Timeline: React.FC<TimelineProps> = ({
       onEntryDeleted?.(selectedEntryId);
       showToast({
         message: 'Entry deleted successfully',
-        type: 'success',
-        position: 'bottom-left',
+        type: 'success'
       });
     } catch (error) {
       showToast({
         message: 'Failed to delete entry. Please try again.',
-        type: 'error',
-        position: 'bottom-left',
+        type: 'error'
       });
     } finally {
       setDeletingId(null);

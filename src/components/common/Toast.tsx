@@ -9,7 +9,16 @@ interface ToastProps {
   onClose?: () => void;
 }
 
-export const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
+interface ShowToastOptions {
+  message: string;
+  type?: 'success' | 'error' | 'info' | 'warning';
+  position?: string;
+  duration?: number;
+}
+
+export const showToast = (options: ShowToastOptions) => {
+  const { message, type = 'info' } = options;
+  
   switch (type) {
     case 'success':
       return toast.success(message);
