@@ -2,15 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
 import { useUserRoles } from '@/hooks/useUserRoles';
-import { doc, getDoc } from 'firebase/firestore';
-import { getDb } from '@/lib/firebase';
 import { Icon } from '@/components/ui/Icon';
 import Link from 'next/link';
 
@@ -19,31 +17,21 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { signIn, user } = useAuth();
+  const { login, user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
+    console.log('[Login Page] User state changed:', user);
     if (user) {
-      // Check if user is a Storiats admin
-      const checkAdminStatus = async () => {
-        try {
-          const db = await getDb();
-          const adminSettingsDoc = await getDoc(doc(db, 'adminSettings', 'storiatsAdmins'));
-          const adminEmails = adminSettingsDoc.exists() ? adminSettingsDoc.data().adminEmails : [];
-          
-          if (adminEmails.includes(user.email?.toLowerCase() || '')) {
-            router.push('/admin');
-            return;
-          }
-          // Default redirect to dashboard
-          router.push('/dashboard');
-        } catch (error) {
-          console.error('Error checking admin status:', error);
-          router.push('/dashboard');
-        }
-      };
-      
-      checkAdminStatus();
+      console.log('[Login Page] User authenticated, redirecting...');
+      // Simple redirect based on admin status
+      if (user.userData?.organizationRoles?.admin) {
+        console.log('[Login Page] Redirecting to admin');
+        router.push('/admin');
+      } else {
+        console.log('[Login Page] Redirecting to dashboard');
+        router.push('/dashboard');
+      }
     }
   }, [user, router]);
 
@@ -51,10 +39,18 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
+    console.log('[Login Form] Submitting with:', { 
+      email: email || 'undefined', 
+      password: password ? '***' : 'undefined',
+      emailLength: email?.length,
+      passwordLength: password?.length
+    });
+
     try {
-      await signIn({ email, password });
+      await login(email, password);
       toast('Signed in successfully', 'success');
     } catch (error) {
+      console.error('[Login Form] Error:', error);
       if (error instanceof Error) {
         toast(`Error signing in: ${error.message}`, 'error');
       } else {

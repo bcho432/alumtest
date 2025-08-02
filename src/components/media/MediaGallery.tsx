@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { MediaService, UploadProgress } from '@/services/MediaService';
 import { MediaFolder, Photo } from '@/types/profile';
 import { Icon } from '@/components/ui/Icon';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -12,8 +12,7 @@ import { useDropzone } from 'react-dropzone';
 import { toast } from 'react-hot-toast';
 import { useUserRoles } from '@/hooks/useUserRoles';
 import { Input } from '@/components/ui/Input';
-import { collection, query, where, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, limit, startAfter, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 
 interface MediaGalleryProps {
   profileId: string;
@@ -49,9 +48,6 @@ export function MediaGallery({ profileId, className, files, onFileClick }: Media
   const [showFolderSettings, setShowFolderSettings] = useState<string | null>(null);
   const [isDraggingFolder, setIsDraggingFolder] = useState<string | null>(null);
   const searchTimeout = useRef<NodeJS.Timeout>();
-  const [lastVisible, setLastVisible] = useState<any>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const PHOTOS_PER_PAGE = 20;
 
   const isAdmin = roles[profileId] === 'admin';
   const isEditor = roles[profileId] === 'editor';
@@ -63,10 +59,10 @@ export function MediaGallery({ profileId, className, files, onFileClick }: Media
       setFolders([{
         id: 'temp',
         name: 'Temporary Uploads',
-        createdBy: user.uid,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        itemCount: 0
+        created_by: user.id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        item_count: 0
       }]);
       setCurrentFolder('temp');
       setIsLoading(false);
@@ -74,127 +70,105 @@ export function MediaGallery({ profileId, className, files, onFileClick }: Media
   }, [isNewProfile, user]);
 
   useEffect(() => {
-    if (!profileId) return;
-    if (!db) {
-      toast.error('Database not initialized');
-      return;
-    }
+    if (!profileId || isNewProfile) return;
 
-    // Skip Firestore queries for new profiles
-    if (isNewProfile) return;
+    const fetchFolders = async () => {
+      try {
+        const { data: foldersData, error: foldersError } = await supabase
+          .from('media_folders')
+          .select('*')
+          .eq('profile_id', profileId)
+          .order('created_at', { ascending: false });
 
-    const dbInstance = db as import('firebase/firestore').Firestore;
-    // Listen to folders
-    const foldersQuery = query(
-      collection(dbInstance, 'profiles', profileId, 'mediaFolders'),
-      orderBy('createdAt', 'desc')
-    );
-
-    const unsubscribeFolders = onSnapshot(foldersQuery, 
-      (snapshot) => {
-        const foldersData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as MediaFolder[];
-        setFolders(foldersData);
-      },
-      (error) => {
+        if (foldersError) {
+          console.error('Error fetching folders:', foldersError);
+        } else {
+          setFolders(foldersData || []);
+        }
+      } catch (error) {
         console.error('Error fetching folders:', error);
-        toast.error('Failed to load folders');
       }
-    );
+    };
 
-    return () => unsubscribeFolders();
+    const fetchPhotos = async () => {
+      try {
+        const { data: photosData, error: photosError } = await supabase
+          .from('media')
+          .select('*')
+          .eq('profile_id', profileId)
+          .order('created_at', { ascending: false });
+
+        if (photosError) {
+          console.error('Error fetching photos:', photosError);
+        } else {
+          setPhotos(photosData || []);
+        }
+      } catch (error) {
+        console.error('Error fetching photos:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchFolders();
+    fetchPhotos();
+
+    // Set up real-time subscriptions
+    const foldersSubscription = supabase
+      .channel('media_folders')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'media_folders', filter: `profile_id=eq.${profileId}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setFolders(prev => [payload.new as MediaFolder, ...prev]);
+          } else if (payload.eventType === 'DELETE') {
+            setFolders(prev => prev.filter(f => f.id !== payload.old.id));
+          } else if (payload.eventType === 'UPDATE') {
+            setFolders(prev => prev.map(f => f.id === payload.new.id ? payload.new as MediaFolder : f));
+          }
+        }
+      )
+      .subscribe();
+
+    const photosSubscription = supabase
+      .channel('media')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'media', filter: `profile_id=eq.${profileId}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setPhotos(prev => [payload.new as Photo, ...prev]);
+          } else if (payload.eventType === 'DELETE') {
+            setPhotos(prev => prev.filter(p => p.id !== payload.old.id));
+          } else if (payload.eventType === 'UPDATE') {
+            setPhotos(prev => prev.map(p => p.id === payload.new.id ? payload.new as Photo : p));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      foldersSubscription.unsubscribe();
+      photosSubscription.unsubscribe();
+    };
   }, [profileId, isNewProfile]);
 
-  useEffect(() => {
-    if (!profileId || !currentFolder) return;
-    if (!db) {
-      toast.error('Database not initialized');
-      return;
-    }
-
-    // Skip Firestore queries for new profiles
-    if (isNewProfile) return;
-
-    const dbInstance = db as import('firebase/firestore').Firestore;
-    const photosQuery = query(
-      collection(dbInstance, 'profiles', profileId, 'mediaFolders', currentFolder, 'photos'),
-      orderBy('uploadedAt', 'desc'),
-      limit(PHOTOS_PER_PAGE)
-    );
-
-    const unsubscribePhotos = onSnapshot(photosQuery,
-      (snapshot) => {
-        const photosData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Photo[];
-        setPhotos(photosData);
-        setFilteredPhotos(photosData);
-        setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
-        setHasMore(snapshot.docs.length === PHOTOS_PER_PAGE);
-        setIsLoading(false);
-      },
-      (error) => {
-        console.error('Error fetching photos:', error);
-        toast.error('Failed to load photos');
-        setIsLoading(false);
-      }
-    );
-
-    return () => unsubscribePhotos();
-  }, [profileId, currentFolder, isNewProfile]);
-
-  const loadMore = async () => {
-    if (!profileId || !currentFolder || !lastVisible || !hasMore) return;
-    if (!db) {
-      toast.error('Database not initialized');
-      return;
-    }
-    const dbInstance = db as import('firebase/firestore').Firestore;
-    try {
-      const nextQuery = query(
-        collection(dbInstance, 'profiles', profileId, 'mediaFolders', currentFolder, 'photos'),
-        orderBy('uploadedAt', 'desc'),
-        startAfter(lastVisible),
-        limit(PHOTOS_PER_PAGE)
-      );
-
-      const snapshot = await getDocs(nextQuery);
-      const newPhotos = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Photo[];
-
-      setPhotos(prev => [...prev, ...newPhotos]);
-      setFilteredPhotos(prev => [...prev, ...newPhotos]);
-      setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
-      setHasMore(snapshot.docs.length === PHOTOS_PER_PAGE);
-    } catch (error) {
-      console.error('Error loading more photos:', error);
-      toast.error('Failed to load more photos');
-    }
-  };
-
   const handleCreateFolder = async () => {
-    if (!user || !newFolderName.trim()) return;
-    if (!db) {
-      toast.error('Database not initialized');
-      return;
-    }
-    const dbInstance = db as import('firebase/firestore').Firestore;
+    if (!newFolderName.trim() || !user) return;
+
     setIsCreatingFolder(true);
     try {
-      await addDoc(collection(dbInstance, 'profiles', profileId, 'mediaFolders'), {
-        name: newFolderName.trim(),
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        itemCount: 0
-      });
+      const { error } = await supabase
+        .from('media_folders')
+        .insert([{
+          profile_id: profileId,
+          name: newFolderName.trim(),
+          created_by: user.id
+        }]);
+
+      if (error) throw error;
 
       setNewFolderName('');
+      setShowFolderModal(false);
       toast.success('Folder created successfully');
     } catch (error) {
       console.error('Error creating folder:', error);
@@ -205,18 +179,84 @@ export function MediaGallery({ profileId, className, files, onFileClick }: Media
   };
 
   const handleDeleteFolder = async (folderId: string) => {
-    if (!user || !isAdmin) return;
-    if (!db) {
-      toast.error('Database not initialized');
-      return;
-    }
-    const dbInstance = db as import('firebase/firestore').Firestore;
+    if (!user) return;
+
     try {
-      await deleteDoc(doc(dbInstance, 'profiles', profileId, 'mediaFolders', folderId));
+      const { error } = await supabase
+        .from('media_folders')
+        .delete()
+        .eq('id', folderId);
+
+      if (error) throw error;
+
       toast.success('Folder deleted successfully');
     } catch (error) {
       console.error('Error deleting folder:', error);
       toast.error('Failed to delete folder');
+    }
+  };
+
+  const handleDeletePhoto = async (photoId: string) => {
+    if (!user) return;
+
+    setIsDeleting(photoId);
+    try {
+      const { error } = await supabase
+        .from('media')
+        .delete()
+        .eq('id', photoId);
+
+      if (error) throw error;
+
+      toast.success('Photo deleted successfully');
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      toast.error('Failed to delete photo');
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
+  const handleUploadPhoto = async (file: File) => {
+    if (!user) return;
+
+    setUploading(true);
+    try {
+      // Upload to Supabase Storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const { data, error } = await supabase.storage
+        .from('media')
+        .upload(`${profileId}/${fileName}`, file);
+
+      if (error) throw error;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('media')
+        .getPublicUrl(`${profileId}/${fileName}`);
+
+      // Save to database
+      const { error: dbError } = await supabase
+        .from('media')
+        .insert([{
+          profile_id: profileId,
+          file_path: `${profileId}/${fileName}`,
+          file_url: publicUrl,
+          file_name: file.name,
+          file_size: file.size,
+          file_type: file.type,
+          uploaded_by: user.id
+        }]);
+
+      if (dbError) throw dbError;
+
+      toast.success('Photo uploaded successfully');
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      toast.error('Failed to upload photo');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -256,16 +296,23 @@ export function MediaGallery({ profileId, className, files, onFileClick }: Media
           setPhotos(prev => [...prev, ...newPhotos]);
           setFilteredPhotos(prev => [...prev, ...newPhotos]);
         } else {
-          // For existing profiles, update Firestore
-          if (!db) {
+          // For existing profiles, update Supabase
+          if (!supabase) {
             toast.error('Database not initialized');
             return;
           }
-          const dbInstance = db as import('firebase/firestore').Firestore;
-          await updateDoc(doc(dbInstance, 'profiles', profileId, 'mediaFolders', currentFolder), {
-            itemCount: photos.length + acceptedFiles.length,
-            updatedAt: serverTimestamp()
-          });
+          const dbInstance = supabase;
+          await supabase.from('media').insert(uploadedFiles.map(url => ({
+            profile_id: profileId,
+            file_path: url,
+            file_url: url,
+            file_name: url.split('/').pop() || 'Untitled',
+            file_size: 0, // Placeholder, will be updated by Supabase Storage
+            file_type: url.split('.').pop() || 'unknown',
+            uploaded_by: user.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })));
         }
 
         toast.success('Photos uploaded successfully');
@@ -282,67 +329,6 @@ export function MediaGallery({ profileId, className, files, onFileClick }: Media
       'video/*': ['.mp4', '.webm', '.ogg']
     }
   });
-
-  const handleDeletePhoto = async (photoId: string) => {
-    if (!user || !currentFolder || (!isAdmin && !isEditor)) return;
-    if (!db) {
-      toast.error('Database not initialized');
-      return;
-    }
-    const dbInstance = db as import('firebase/firestore').Firestore;
-    try {
-      await deleteDoc(doc(dbInstance, 'profiles', profileId, 'mediaFolders', currentFolder, 'photos', photoId));
-
-      // Update folder item count
-      await updateDoc(doc(dbInstance, 'profiles', profileId, 'mediaFolders', currentFolder), {
-        itemCount: photos.length - 1,
-        updatedAt: serverTimestamp()
-      });
-
-      toast.success('Photo deleted successfully');
-    } catch (error) {
-      console.error('Error deleting photo:', error);
-      toast.error('Failed to delete photo');
-    }
-  };
-
-  const handleUploadPhoto = async (file: File) => {
-    if (!user || !currentFolder || (!isAdmin && !isEditor)) return;
-    if (!db) {
-      toast.error('Database not initialized');
-      return;
-    }
-    const dbInstance = db as import('firebase/firestore').Firestore;
-    setIsUploading(true);
-    try {
-      await MediaService.uploadMedia(file, currentFolder, user.uid, (progress) => {
-        setUploadProgress(prev => {
-          const newProgress = [...prev];
-          const index = newProgress.findIndex(p => p.file === file);
-          if (index >= 0) {
-            newProgress[index] = { ...newProgress[index], progress };
-          } else {
-            newProgress.push({ file, progress, status: 'uploading' });
-          }
-          return newProgress;
-        });
-      });
-      
-      // Update folder item count
-      await updateDoc(doc(dbInstance, 'profiles', profileId, 'mediaFolders', currentFolder), {
-        itemCount: photos.length + 1,
-        updatedAt: serverTimestamp()
-      });
-
-      toast.success('Photo uploaded successfully');
-    } catch (error) {
-      console.error('Error uploading photo:', error);
-      toast.error('Failed to upload photo');
-    } finally {
-      setIsUploading(false);
-      setUploadProgress([]);
-    }
-  };
 
   const renderMediaPreview = (item: Photo) => {
     const isVideo = item.fileType?.startsWith('video/');
@@ -726,18 +712,7 @@ export function MediaGallery({ profileId, className, files, onFileClick }: Media
               {search ? 'No media found matching your search' : 'No media in this folder'}
             </div>
           )}
-          {hasMore && !search && (
-            <div className="mt-8 text-center">
-              <Button
-                onClick={loadMore}
-                variant="outline"
-                className="w-full sm:w-auto"
-                aria-label="Load more media"
-              >
-                Load More
-              </Button>
-            </div>
-          )}
+          {/* hasMore and loadMore logic removed as per new_code */}
         </div>
       )}
 

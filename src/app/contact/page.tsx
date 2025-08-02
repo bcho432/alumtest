@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -10,8 +10,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Spinner } from '@/components/ui/Spinner';
 import { Icon } from '@/components/ui/Icon';
 import { useToast } from '@/components/ui/use-toast';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { getFirebaseServices } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import { usePublishedContent } from '@/hooks/usePublishedContent';
 import { useStoriatsAdmins } from '@/hooks/useStoriatsAdmins';
 
@@ -50,20 +49,23 @@ export default function Contact() {
     setIsSubmitting(true);
 
     try {
-      const { db } = await getFirebaseServices();
-      if (!db) throw new Error('Firestore instance not available');
+      // Create support ticket using Supabase
+      const { data, error } = await supabase
+        .from('support_tickets')
+        .insert([{
+          name: formData.name,
+          email: formData.email,
+          subject: formData.subject,
+          message: formData.message,
+          status: 'new',
+          priority: 'medium',
+          created_by: user?.id || 'anonymous',
+          type: 'contact'
+        }]);
 
-      // Create support ticket
-      const ticketData = {
-        ...formData,
-        status: 'new',
-        priority: 'medium',
-        createdAt: serverTimestamp(),
-        createdBy: user?.uid || 'anonymous',
-        type: 'contact'
-      };
-
-      await addDoc(collection(db, 'support_tickets'), ticketData);
+      if (error) {
+        throw error;
+      }
 
       // Get email recipients from admin settings
       const recipients = adminSettings?.emailRecipients || [];

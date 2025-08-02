@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase';
 import { Icon } from '@/components/common/Icon';

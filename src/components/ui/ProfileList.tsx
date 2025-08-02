@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { getFirebaseServices } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import { Card } from './Card';
 import { Button } from './Button';
 import { Input } from './Input';
@@ -11,12 +10,12 @@ import { useToast } from './toast';
 
 interface Profile {
   id: string;
-  name: string;
+  full_name: string;
   email: string;
   role: string;
   status: 'active' | 'pending' | 'inactive';
-  lastActive?: Date;
-  createdAt: Date;
+  last_active?: string;
+  created_at: string;
 }
 
 interface ProfileListProps {
@@ -41,28 +40,18 @@ export function ProfileList({ universityId, onUpdate }: ProfileListProps) {
       setLoading(true);
       setError(null);
 
-      const { db } = await getFirebaseServices();
-      if (!db) {
-        throw new Error('Database is not initialized');
+      const { data: profilesData, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('university_id', universityId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        throw error;
       }
 
-      const profilesRef = collection(db, 'profiles');
-      const q = query(
-        profilesRef,
-        where('universityId', '==', universityId),
-        orderBy('createdAt', 'desc'),
-        limit(50)
-      );
-
-      const snapshot = await getDocs(q);
-      const profilesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate(),
-        lastActive: doc.data().lastActive?.toDate()
-      })) as Profile[];
-
-      setProfiles(profilesData);
+      setProfiles(profilesData || []);
     } catch (err) {
       console.error('Error loading profiles:', err);
       setError('Failed to load profiles. Please try again.');
@@ -102,33 +91,58 @@ export function ProfileList({ universityId, onUpdate }: ProfileListProps) {
     }
 
     try {
-      const { db } = await getFirebaseServices();
-      if (!db) {
-        throw new Error('Database is not initialized');
+      if (action === 'delete') {
+        const { error } = await supabase
+          .from('profiles')
+          .delete()
+          .in('id', selectedProfiles);
+
+        if (error) throw error;
+
+        setProfiles(prev => prev.filter(profile => !selectedProfiles.includes(profile.id)));
+        setSelectedProfiles([]);
+        
+        toast({
+          title: 'Profiles deleted',
+          description: `${selectedProfiles.length} profile(s) have been deleted.`,
+          variant: 'default'
+        });
+      } else {
+        const status = action === 'activate' ? 'active' : 'inactive';
+        const { error } = await supabase
+          .from('profiles')
+          .update({ status })
+          .in('id', selectedProfiles);
+
+        if (error) throw error;
+
+        setProfiles(prev => prev.map(profile => 
+          selectedProfiles.includes(profile.id) 
+            ? { ...profile, status }
+            : profile
+        ));
+        setSelectedProfiles([]);
+
+        toast({
+          title: 'Profiles updated',
+          description: `${selectedProfiles.length} profile(s) have been ${action}d.`,
+          variant: 'default'
+        });
       }
 
-      // Implement bulk actions here
-      // This is a placeholder for the actual implementation
-      toast({
-        title: 'Action completed',
-        description: `Successfully ${action}ed ${selectedProfiles.length} profiles.`,
-        variant: 'success'
-      });
-
-      await loadProfiles();
-      setSelectedProfiles([]);
+      onUpdate();
     } catch (err) {
-      console.error('Error performing bulk action:', err);
+      console.error(`Error performing ${action} action:`, err);
       toast({
         title: 'Error',
-        description: 'Failed to perform the action. Please try again.',
+        description: `Failed to ${action} profiles. Please try again.`,
         variant: 'destructive'
       });
     }
   };
 
   const filteredProfiles = profiles.filter(profile =>
-    profile.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    profile.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     profile.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -242,7 +256,7 @@ export function ProfileList({ universityId, onUpdate }: ProfileListProps) {
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">
-                          {profile.name}
+                          {profile.full_name}
                         </div>
                       </div>
                     </div>
@@ -268,8 +282,8 @@ export function ProfileList({ universityId, onUpdate }: ProfileListProps) {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      {profile.lastActive
-                        ? new Date(profile.lastActive).toLocaleDateString()
+                      {profile.last_active
+                        ? new Date(profile.last_active).toLocaleDateString()
                         : 'Never'}
                     </div>
                   </td>

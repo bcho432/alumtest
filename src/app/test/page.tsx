@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
 export default function TestPage() {
-  const { signIn, signOut, user } = useAuth();
+  const { login, logout, user } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -26,7 +26,7 @@ export default function TestPage() {
     setError(null);
     
     try {
-      await signIn(formData);
+      await login(formData.email, formData.password);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     }
@@ -48,7 +48,7 @@ export default function TestPage() {
                 Signed in as: {user.email}
               </p>
               <Button
-                onClick={() => signOut()}
+                onClick={() => logout()}
                 className="w-full"
               >
                 Sign Out

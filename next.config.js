@@ -1,6 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Set default port to 3001
+  devIndicators: {
+    buildActivity: false,
+  },
+  // Configure default port
+  serverRuntimeConfig: {
+    port: 3001,
+  },
   images: {
     domains: ['firebasestorage.googleapis.com'],
   },

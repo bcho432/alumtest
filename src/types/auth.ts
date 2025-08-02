@@ -64,16 +64,19 @@ export interface AuthError {
 }
 
 export interface AuthContextType {
-  user: FirebaseUser | null;
+  user: any; // Changed from FirebaseUser to any for Supabase compatibility
+  session: any; // Add session for Supabase
   loading: boolean;
-  error: Error | null;
+  initializing: boolean; // Add initializing state
+  lastError: Error | null; // Changed from error to lastError
   isAdmin: boolean;
-  signIn: (data: SignInFormData) => Promise<FirebaseUser>;
-  signUp: (data: SignUpFormData) => Promise<FirebaseUser>;
-  signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
-  updatePassword: (password: string) => Promise<void>;
-  updateEmail: (email: string) => Promise<void>;
-  updateProfile: (data: Partial<UserProfile>) => Promise<void>;
+  userProfile: any; // Add userProfile from users table
   userRoles: UserRoles;
+  signIn: (data: SignInFormData) => Promise<{ success: boolean; error?: string }>;
+  signUp: (data: SignUpFormData) => Promise<{ success: boolean; error?: string }>;
+  signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
+  updatePassword: (password: string) => Promise<{ success: boolean; error?: string }>;
+  updateEmail: (email: string) => Promise<{ success: boolean; error?: string }>;
+  updateProfile: (data: Partial<UserProfile>) => Promise<{ success: boolean; error?: string }>;
 } 

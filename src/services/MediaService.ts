@@ -3,7 +3,7 @@ import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, 
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, uploadBytesResumable } from 'firebase/storage';
 import { MediaFolder, Photo } from '@/types/profile';
 import { v4 as uuidv4 } from 'uuid';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 
 export interface UploadProgress {
   file: File;

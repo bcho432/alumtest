@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { getFirebaseServices } from '@/lib/firebase';
-import { collection, query as firestoreQuery, where, getDocs, DocumentData, orderBy, limit } from 'firebase/firestore';
+import { supabase } from '@/lib/supabase';
 import { Icon } from '@/components/ui/Icon';
 import { Input } from '@/components/ui/Input';
 
@@ -44,46 +43,44 @@ export function SearchBar() {
 
       setIsLoading(true);
       try {
-        const { db } = await getFirebaseServices();
-        
         // Search profiles
-        const profilesRef = collection(db, 'profiles');
-        const profilesQuery = firestoreQuery(
-          profilesRef,
-          where('name', '>=', searchQuery),
-          where('name', '<=', searchQuery + '\uf8ff'),
-          orderBy('name'),
-          limit(5)
-        );
-        
-        const profilesSnapshot = await getDocs(profilesQuery);
-        const profileResults = profilesSnapshot.docs.map((doc: DocumentData) => ({
-          id: doc.id,
-          name: doc.data().name,
-          type: 'profile' as const,
-          universityName: doc.data().universityName,
-          graduationYear: doc.data().graduationYear,
-          department: doc.data().department
-        }));
+        const { data: profileResults, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, full_name, university_name, graduation_year, department')
+          .ilike('full_name', `%${searchQuery}%`)
+          .limit(5);
+
+        if (profileError) {
+          console.error('Error searching profiles:', profileError);
+        }
 
         // Search universities
-        const universitiesRef = collection(db, 'universities');
-        const universitiesQuery = firestoreQuery(
-          universitiesRef,
-          where('name', '>=', searchQuery),
-          where('name', '<=', searchQuery + '\uf8ff'),
-          orderBy('name'),
-          limit(5)
-        );
-        
-        const universitiesSnapshot = await getDocs(universitiesQuery);
-        const universityResults = universitiesSnapshot.docs.map((doc: DocumentData) => ({
-          id: doc.id,
-          name: doc.data().name,
+        const { data: universityResults, error: universityError } = await supabase
+          .from('universities')
+          .select('id, name')
+          .ilike('name', `%${searchQuery}%`)
+          .limit(5);
+
+        if (universityError) {
+          console.error('Error searching universities:', universityError);
+        }
+
+        const formattedProfileResults = (profileResults || []).map((profile: any) => ({
+          id: profile.id,
+          name: profile.full_name,
+          type: 'profile' as const,
+          universityName: profile.university_name,
+          graduationYear: profile.graduation_year,
+          department: profile.department
+        }));
+
+        const formattedUniversityResults = (universityResults || []).map((university: any) => ({
+          id: university.id,
+          name: university.name,
           type: 'university' as const
         }));
 
-        setResults([...profileResults, ...universityResults]);
+        setResults([...formattedProfileResults, ...formattedUniversityResults]);
       } catch (error) {
         console.error('Error searching:', error);
         setResults([]);

@@ -5,7 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { getFirebaseServices } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { Icon } from '@/components/ui/Icon';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import type { UniversityProfile } from '@/types/university';
 import type { UserProfile } from '@/types/profile';
 import type { Memorial } from '@/types/memorial';

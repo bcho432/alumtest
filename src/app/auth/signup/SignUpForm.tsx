@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -15,7 +15,7 @@ import type { SignUpFormData } from '@/types/auth';
 export default function SignUpForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { signUp } = useAuth();
+  const { signup } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<SignUpFormData>({
@@ -56,7 +56,7 @@ export default function SignUpForm() {
 
     try {
       if (validateForm()) {
-        await signUp(formData);
+        await signup(formData.email, formData.password);
         
         // Redirect based on invitation status or to dashboard
         if (redirectUrl) {

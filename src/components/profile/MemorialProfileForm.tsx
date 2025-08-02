@@ -1,32 +1,35 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { Icon } from '@/components/ui/Icon';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
-import { Button } from '@/components/ui/Button';
-import { MemorialProfile, MemorialProfileFormData, TimelineEvent, LifeEvent } from '@/types/profile';
-import { toast } from 'react-hot-toast';
+import { Select } from '@/components/ui/Select';
+import { Switch } from '@/components/ui/Switch';
+import { Icon } from '@/components/ui/Icon';
+import { Spinner } from '@/components/ui/Spinner';
 import { Badge } from '@/components/ui/Badge';
+import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
+import { useToast } from '@/hooks/useToast';
+import { MemorialProfile, LifeEvent } from '@/types/profile';
+import { debounce } from 'lodash';
+import { supabase } from '@/lib/supabase';
+import { motion } from 'framer-motion';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import { TabsRoot, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
-import { Switch } from '@/components/ui/Switch';
-import { Card } from '@/components/ui/Card';
-import { Dialog } from '@/components/ui/Dialog';
-import { TimelineMediaUpload } from '@/components/media/TimelineMediaUpload';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { SimpleTimelineBuilder } from '@/components/timeline/SimpleTimelineBuilder';
-import debounce from 'lodash/debounce';
-import { Timestamp } from 'firebase/firestore';
-import { LifeStoryEditor } from '@/components/profile/LifeStoryEditor';
-import { Select } from '@/components/ui/Select';
+import { TimelineMediaUpload } from '@/components/media/TimelineMediaUpload';
 import { TimelineBuilder } from '@/components/timeline/TimelineBuilder';
-import { useAuth } from '@/contexts/AuthContext';
-import { getFirebaseServices } from '@/lib/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { LifeStoryEditor } from '@/components/profile/LifeStoryEditor';
+import { Timestamp } from 'firebase/firestore';
 
 interface MemorialProfileFormProps {
   profile?: MemorialProfile;
-  onSubmit: (data: MemorialProfileFormData) => Promise<void>;
+  onSubmit: (data: any) => Promise<void>;
   onCancel: () => void;
   className?: string;
 }
@@ -65,7 +68,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
   const [lockError, setLockError] = useState<string | null>(null);
   const LOCK_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
-  const [formData, setFormData] = useState<MemorialProfileFormData>(() => {
+  const [formData, setFormData] = useState<any>(() => {
     console.log('[MemorialProfileForm] Initializing form data with profile:', profile);
     return {
       id: profile?.id || '',
@@ -121,18 +124,17 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
 
   // Check and acquire lock
   const checkAndAcquireLock = async () => {
-    if (!profile?.id || !user?.uid) return;
+    if (!profile?.id || !user?.id) return;
 
     try {
-      const { db } = await getFirebaseServices();
-      if (!db) return;
-
-      const profileRef = doc(db, `universities/${profile.universityId}/profiles`, profile.id);
-      const profileDoc = await getDoc(profileRef);
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', profile.id)
+        .single();
       
-      if (!profileDoc.exists()) return;
+      if (error || !profileData) return;
 
-      const profileData = profileDoc.data() as MemorialProfile;
       const now = new Date();
 
       // Check if there's an existing lock
@@ -140,7 +142,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
         const lockTime = new Date(profileData.lock.timestamp);
         const isLockExpired = now.getTime() - lockTime.getTime() > LOCK_TIMEOUT;
 
-        if (!isLockExpired && profileData.lock.userId !== user.uid) {
+        if (!isLockExpired && profileData.lock.user_id !== user.id) {
           setIsLocked(true);
           setLockError('This profile is currently being edited by another user. Please try again later.');
           return false;
@@ -148,12 +150,17 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
       }
 
       // Create or update lock
-      await updateDoc(profileRef, {
-        lock: {
-          userId: user.uid,
-          timestamp: now
-        }
-      });
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          lock: {
+            user_id: user.id,
+            timestamp: now.toISOString()
+          }
+        })
+        .eq('id', profile.id);
+
+      if (updateError) throw updateError;
 
       setIsLocked(false);
       setLockError(null);
@@ -167,16 +174,17 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
 
   // Release lock
   const releaseLock = async () => {
-    if (!profile?.id || !user?.uid) return;
+    if (!profile?.id || !user?.id) return;
 
     try {
-      const { db } = await getFirebaseServices();
-      if (!db) return;
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          lock: null
+        })
+        .eq('id', profile.id);
 
-      const profileRef = doc(db, `universities/${profile.universityId}/profiles`, profile.id);
-      await updateDoc(profileRef, {
-        lock: null
-      });
+      if (error) throw error;
     } catch (error) {
       console.error('Error releasing lock:', error);
     }
@@ -196,7 +204,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
 
   // Memoize the debounced save function first
   const debouncedSave = useMemo(
-    () => debounce(async (data: MemorialProfileFormData) => {
+    () => debounce(async (data: any) => {
       if (formState.isSaving) return;
       
       try {
@@ -224,7 +232,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
           hasUnsavedChanges: false
         }));
         console.log('[MemorialProfileForm] Auto-save completed successfully');
-        toast.success('Changes saved successfully');
+        // toast.success('Changes saved successfully'); // Removed toast as per new_code
       } catch (error) {
         console.error('[MemorialProfileForm] Auto-save failed:', error);
         setFormState(prev => ({
@@ -232,7 +240,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
           isSaving: false,
           lastSaveError: 'Failed to auto-save changes'
         }));
-        toast.error('Failed to auto-save changes');
+        // toast.error('Failed to auto-save changes'); // Removed toast as per new_code
       }
     }, 2000),
     [onSubmit]
@@ -254,7 +262,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
   }, [formState.isTabChanging, formState.hasUnsavedChanges, debouncedSave, formData]);
 
   // Update form data handler with memoization
-  const updateFormData = useCallback((updates: Partial<MemorialProfileFormData>): void => {
+  const updateFormData = useCallback((updates: Partial<any>): void => {
     const updateKeys = Object.keys(updates);
     const firstKey = updateKeys[0];
     const value = firstKey ? (updates as any)[firstKey] : undefined;
@@ -276,7 +284,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
   }, [formData, formState.isSaving, debouncedSave]);
 
   // Validate form data
-  const validateForm = (data: MemorialProfileFormData): boolean => {
+  const validateForm = (data: any): boolean => {
     console.log('[MemorialProfileForm] Validating form data:', {
       name: data.name,
       dateOfBirth: data.basicInfo?.dateOfBirth,
@@ -369,7 +377,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
       
       // Validate form data before submitting
       if (status === 'published' && !validateForm(formData)) {
-        toast.error('Please fill in all required fields before publishing');
+        // toast.error('Please fill in all required fields before publishing'); // Removed toast as per new_code
         return;
       }
 
@@ -378,7 +386,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
         ...formData,
         status,
         updatedAt: Timestamp.now(),
-        updatedBy: user?.uid || 'system'
+        updatedBy: user?.id || 'system'
       };
 
       const submitDataRecord = submitData as Record<string, any>;
@@ -388,7 +396,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
         }
       });
 
-      await onSubmit(submitDataRecord as MemorialProfileFormData);
+      await onSubmit(submitDataRecord as any); // Changed type to any as per new_code
       
       setFormState(prev => ({ 
         ...prev, 
@@ -398,9 +406,9 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
       }));
 
       if (status === 'published') {
-        toast.success('Memorial published successfully');
+        // toast.success('Memorial published successfully'); // Removed toast as per new_code
       } else {
-        toast.success('Draft saved successfully');
+        // toast.success('Draft saved successfully'); // Removed toast as per new_code
       }
 
       // Redirect to the university admin management page
@@ -412,7 +420,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
         isSaving: false,
         lastSaveError: 'Failed to save changes'
       }));
-      toast.error('Failed to save changes');
+      // toast.error('Failed to save changes'); // Removed toast as per new_code
     }
   };
 
@@ -438,7 +446,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
   const handleAddTag = () => {
     if (!newTag.trim()) return;
     if (formData.metadata?.tags?.includes(newTag.trim())) {
-      toast.error('Tag already exists');
+      // toast.error('Tag already exists'); // Removed toast as per new_code
       return;
     }
     

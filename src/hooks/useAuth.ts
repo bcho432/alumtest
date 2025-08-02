@@ -1,21 +1,7 @@
-import { useState, useLayoutEffect } from 'react';
-import { 
-  getAuth,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  getDb
-} from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
-import { User as FirebaseUser } from 'firebase/auth';
+import { useSupabaseAuth } from '@/contexts/SupabaseAuthContext';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 
-async function assertDb() {
-  const db = await getDb();
-  if (!db) throw new Error('Firestore is not initialized');
-  return db;
-}
-
+// Interface to maintain backward compatibility
 interface UserData {
   id: string;
   organizationRoles?: {
@@ -27,111 +13,83 @@ interface UserData {
   [key: string]: any;
 }
 
-interface User extends FirebaseUser {
+interface User extends SupabaseUser {
   userData?: UserData;
+  displayName?: string; // Add displayName property
 }
 
 export const useAuth = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const auth = getAuth();
+  const supabaseAuth = useSupabaseAuth();
+  
+  // Transform Supabase user to match the old interface
+  const user: User | null = supabaseAuth.user ? {
+    ...supabaseAuth.user,
+    // Add displayName from user profile if available
+    displayName: supabaseAuth.userProfile?.display_name || supabaseAuth.user.user_metadata?.full_name || '',
+    userData: {
+      id: supabaseAuth.user.id,
+      organizationRoles: {
+        admin: supabaseAuth.isAdmin,
+        editor: false, // We'll implement this later
+        viewer: false
+      },
+      universityAdmins: [], // We'll implement this later
+    }
+  } : null;
 
-  useLayoutEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          const db = await assertDb();
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          if (userDoc.exists()) {
-            const userData = { id: userDoc.id, ...userDoc.data() } as UserData;
-            setUser({ ...firebaseUser, userData });
-          }
-        } catch (error) {
-          console.error('Error fetching user data:', error);
-          setUser(firebaseUser);
-        }
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
 
-    return () => unsubscribe();
-  }, [auth]);
 
   const login = async (email: string, password: string) => {
-    try {
-      const auth = getAuth();
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      try {
-        const db = await assertDb();
-        const userDoc = await getDoc(doc(db, 'users', result.user.uid));
-        if (userDoc.exists()) {
-          const userData = { id: userDoc.id, ...userDoc.data() } as UserData;
-          setUser({ ...result.user, userData });
-        }
-      } catch (error) {
-        console.error('Error fetching user data after login:', error);
-        setUser(result.user);
-      }
-      return result;
-    } catch (error) {
-      console.error('Error logging in:', error);
-      throw error;
+    const result = await supabaseAuth.signIn({
+      email,
+      password
+    });
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Login failed');
     }
+    
+    // Don't return user immediately - the auth state will update asynchronously
+    return { success: true };
   };
 
   const signup = async (email: string, password: string) => {
-    try {
-      const auth = getAuth();
-      const result = await createUserWithEmailAndPassword(auth, email, password);
-      try {
-        const db = await assertDb();
-        const userDoc = await getDoc(doc(db, 'users', result.user.uid));
-        if (userDoc.exists()) {
-          const userData = { id: userDoc.id, ...userDoc.data() } as UserData;
-          setUser({ ...result.user, userData });
-        }
-      } catch (error) {
-        console.error('Error fetching user data after signup:', error);
-        setUser(result.user);
-      }
-      return result;
-    } catch (error) {
-      console.error('Error signing up:', error);
-      throw error;
+    const result = await supabaseAuth.signUp({
+      email,
+      password,
+      name: email.split('@')[0] // Default name from email
+    });
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Signup failed');
     }
+    
+    // Don't return user immediately - the auth state will update asynchronously
+    return { success: true };
   };
 
   const logout = async () => {
-    try {
-      const auth = getAuth();
-      await signOut(auth);
-      setUser(null);
-    } catch (error) {
-      console.error('Error logging out:', error);
-      throw error;
-    }
+    await supabaseAuth.signOut();
   };
 
-  const isGlobalAdmin = user?.userData?.organizationRoles?.admin === true;
-  const isEditor = user?.userData?.organizationRoles?.editor === true;
-  const isViewer = user?.userData?.organizationRoles?.viewer === true;
+  // Admin role checks
+  const isGlobalAdmin = supabaseAuth.isAdmin;
+  const isEditor = false; // We'll implement this later
+  const isViewer = false; // We'll implement this later
 
   const isUniversityAdmin = (universityId: string) => {
-    return Array.isArray(user?.userData?.universityAdmins) && 
-           user.userData.universityAdmins.includes(universityId);
+    // We'll implement university admin roles later
+    return false;
   };
 
-  const hasAnyUniversityAdminRole = Array.isArray(user?.userData?.universityAdmins) && 
-                                  user.userData.universityAdmins.length > 0;
+  const hasAnyUniversityAdminRole = false; // We'll implement this later
 
   // isAdmin is true if user is either a global admin or has any university admin role
   const isAdmin = isGlobalAdmin || hasAnyUniversityAdminRole;
 
   return {
     user,
-    loading,
+    loading: supabaseAuth.loading,
     login,
     signup,
     logout,

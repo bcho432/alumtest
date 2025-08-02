@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { TabsRoot, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
@@ -9,12 +9,10 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { toast } from 'react-hot-toast';
-import { getFirebaseServices } from '@/lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
-import { Timestamp } from 'firebase/firestore';
+import { supabase } from '@/lib/supabase';
 
 export default function ProfilePage() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, logout } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('profile');
   const [displayName, setDisplayName] = useState('');
@@ -31,7 +29,7 @@ export default function ProfilePage() {
       router.push('/auth/login');
     }
     if (user) {
-      setDisplayName(user.displayName || '');
+      setDisplayName(user.displayName || user.userData?.displayName || '');
     }
   }, [user, loading, router, isRouterReady]);
 
@@ -40,16 +38,17 @@ export default function ProfilePage() {
     
     setIsSaving(true);
     try {
-      const { db } = await getFirebaseServices();
-      if (!db) throw new Error('Firestore instance not available');
+      const { error } = await supabase
+        .from('users')
+        .update({
+          display_name: displayName,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
 
-      const updateData = {
-        displayName: displayName,
-        updatedBy: user?.uid,
-        updatedAt: Timestamp.fromDate(new Date()),
-      };
-
-      await updateDoc(doc(db, 'users', user.uid), updateData);
+      if (error) {
+        throw error;
+      }
 
       toast.success('Profile updated successfully');
       setIsEditing(false);
@@ -122,14 +121,14 @@ export default function ProfilePage() {
                         variant="outline"
                         onClick={() => {
                           setIsEditing(false);
-                          setDisplayName(user.displayName || '');
+                          setDisplayName(user.displayName || user.userData?.displayName || '');
                         }}
                       >
                         Cancel
                       </Button>
                     </div>
                   ) : (
-                    <div className="mt-1 text-sm text-gray-900">{user.displayName || 'Not set'}</div>
+                    <div className="mt-1 text-sm text-gray-900">{user.displayName || user.userData?.displayName || 'Not set'}</div>
                   )}
                 </div>
               </div>
@@ -178,7 +177,7 @@ export default function ProfilePage() {
                     <div>
                       <Button
                         variant="primary"
-                        onClick={() => signOut()}
+                        onClick={() => logout()}
                         className="bg-red-600 hover:bg-red-700"
                       >
                         Sign Out

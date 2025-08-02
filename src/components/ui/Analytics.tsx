@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { getFirebaseServices } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import { Card } from './Card';
 import { Icon } from './Icon';
 import { Spinner } from './Spinner';
@@ -37,59 +36,52 @@ export function Analytics({ universityId }: AnalyticsProps) {
       setLoading(true);
       setError(null);
 
-      const { db } = await getFirebaseServices();
-      if (!db) {
-        throw new Error('Database is not initialized');
+      // Load profiles
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('university_id', universityId);
+
+      if (profilesError) {
+        throw profilesError;
       }
 
-      // Load profiles
-      const profilesRef = collection(db, 'profiles');
-      const profilesQuery = query(
-        profilesRef,
-        where('universityId', '==', universityId)
-      );
-      const profilesSnapshot = await getDocs(profilesQuery);
-      const totalProfiles = profilesSnapshot.size;
-      const activeProfiles = profilesSnapshot.docs.filter(
-        doc => doc.data().status === 'active'
-      ).length;
+      const totalProfiles = profilesData?.length || 0;
+      const activeProfiles = profilesData?.filter(profile => profile.status === 'active').length || 0;
 
-      // Load memorials
-      const memorialsRef = collection(db, 'memorials');
-      const memorialsQuery = query(
-        memorialsRef,
-        where('universityId', '==', universityId)
-      );
-      const memorialsSnapshot = await getDocs(memorialsQuery);
-      const totalMemorials = memorialsSnapshot.size;
-      const activeMemorials = memorialsSnapshot.docs.filter(
-        doc => doc.data().status === 'active'
-      ).length;
+      // Load memorials (assuming they're in the profiles table with type='memorial')
+      const memorialsData = profilesData?.filter(profile => profile.type === 'memorial') || [];
+      const totalMemorials = memorialsData.length;
+      const activeMemorials = memorialsData.filter(memorial => memorial.status === 'active').length;
 
       // Load users
-      const usersRef = collection(db, 'users');
-      const usersQuery = query(
-        usersRef,
-        where('universityId', '==', universityId)
-      );
-      const usersSnapshot = await getDocs(usersQuery);
-      const totalUsers = usersSnapshot.size;
-      const activeUsers = usersSnapshot.docs.filter(
-        doc => doc.data().status === 'active'
-      ).length;
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('university_id', universityId);
 
-      // Calculate views and engagement
+      if (usersError) {
+        throw usersError;
+      }
+
+      const totalUsers = usersData?.length || 0;
+      const activeUsers = usersData?.filter(user => user.status === 'active').length || 0;
+
+      // Calculate views and engagement (assuming views are tracked in a separate table)
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const viewsRef = collection(db, 'views');
-      const viewsQuery = query(
-        viewsRef,
-        where('universityId', '==', universityId),
-        where('timestamp', '>=', thirtyDaysAgo)
-      );
-      const viewsSnapshot = await getDocs(viewsQuery);
-      const viewsLast30Days = viewsSnapshot.size;
+      const { data: viewsData, error: viewsError } = await supabase
+        .from('views')
+        .select('*')
+        .eq('university_id', universityId)
+        .gte('timestamp', thirtyDaysAgo.toISOString());
+
+      if (viewsError) {
+        console.warn('Views data not available:', viewsError);
+      }
+
+      const viewsLast30Days = viewsData?.length || 0;
 
       // Calculate engagement rate (views per active profile)
       const engagementRate = activeProfiles > 0
@@ -97,12 +89,13 @@ export function Analytics({ universityId }: AnalyticsProps) {
         : 0;
 
       // Calculate profile completion rate
-      const completedProfiles = profilesSnapshot.docs.filter(
-        doc => {
-          const data = doc.data();
-          return data.status === 'active' && data.completionRate >= 80;
-        }
-      ).length;
+      const completedProfiles = profilesData?.filter(profile => {
+        // Define completion criteria
+        return profile.full_name && 
+               profile.description && 
+               profile.basic_info?.biography;
+      }).length || 0;
+
       const profileCompletionRate = totalProfiles > 0
         ? (completedProfiles / totalProfiles) * 100
         : 0;
@@ -114,7 +107,7 @@ export function Analytics({ universityId }: AnalyticsProps) {
         activeMemorials,
         totalUsers,
         activeUsers,
-        totalViews: viewsLast30Days,
+        totalViews: viewsLast30Days, // Using last 30 days as total for now
         viewsLast30Days,
         engagementRate,
         profileCompletionRate

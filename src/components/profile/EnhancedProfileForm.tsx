@@ -9,10 +9,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Select } from '@/components/ui/Select';
 import { Tabs } from '@/components/ui/Tabs';
 import { useToast } from '@/components/ui/toast';
-import { getFirebaseServices } from '@/lib/firebase';
-import { collection, doc, setDoc, updateDoc, getDoc, Timestamp } from 'firebase/firestore';
-import { storage } from '@/lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { supabase } from '@/lib/supabase';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/Dialog';
@@ -32,29 +29,29 @@ const RichTextEditor = dynamic(() => import('@/components/ui/RichTextEditor').th
 });
 
 interface ProfileFormData {
-  name: string;
+  full_name: string;
   type: 'personal' | 'memorial';
   description: string;
-  imageUrl: string;
-  basicInfo: {
-    dateOfBirth: Date | Timestamp | null;
-    dateOfDeath: Date | Timestamp | null;
+  image_url: string;
+  basic_info: {
+    date_of_birth: Date | string | null;
+    date_of_death: Date | string | null;
     biography: string;
     photo: string;
-    birthLocation: string;
-    deathLocation: string;
+    birth_location: string;
+    death_location: string;
   };
-  lifeStory: {
+  life_story: {
     content: string;
-    updatedAt: Date | Timestamp;
+    updated_at: Date | string;
   };
   status: 'draft' | 'published';
-  isPublic: boolean;
+  is_public: boolean;
   metadata: {
     tags: string[];
     categories: string[];
-    lastModifiedBy: string;
-    lastModifiedAt: Timestamp;
+    last_modified_by: string;
+    last_modified_at: string;
     version: number;
   };
 }
@@ -76,48 +73,34 @@ type TabId = typeof tabs[number]['id'];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
-// Add type guard functions at the top of the file
-const isTimestamp = (value: unknown): value is Timestamp => {
-  return value instanceof Timestamp;
-};
-
-const isDate = (value: unknown): value is Date => {
-  return value instanceof Date;
-};
-
-const toDate = (value: Date | Timestamp | null): Date | null => {
+const toDate = (value: Date | string | null): Date | null => {
   if (!value) return null;
-  if (isTimestamp(value)) return value.toDate();
-  if (isDate(value)) return value;
+  if (value instanceof Date) return value;
+  if (typeof value === 'string') return new Date(value);
   return null;
 };
 
-const validateDates = (birthDate: Date | Timestamp | null, deathDate: Date | Timestamp | null): string[] => {
+const validateDates = (birthDate: Date | string | null, deathDate: Date | string | null): string[] => {
   const errors: string[] = [];
   const now = new Date();
   
   if (birthDate) {
-    const birth = birthDate instanceof Timestamp ? birthDate.toDate() : birthDate;
-    if (birth > now) {
-      errors.push('Date of birth must be in the past');
-    }
-    if (deathDate) {
-      const death = deathDate instanceof Timestamp ? deathDate.toDate() : deathDate;
-      if (birth > death) {
-        errors.push('Date of birth must be before date of death');
-      }
+    const birth = toDate(birthDate);
+    if (birth && birth > now) {
+      errors.push('Birth date cannot be in the future');
     }
   }
   
   if (deathDate) {
-    const death = deathDate instanceof Timestamp ? deathDate.toDate() : deathDate;
-    if (death > now) {
-      errors.push('Date of death must be in the past');
+    const death = toDate(deathDate);
+    if (death && death > now) {
+      errors.push('Death date cannot be in the future');
     }
-    if (birthDate) {
-      const birth = birthDate instanceof Timestamp ? birthDate.toDate() : birthDate;
-      if (death < birth) {
-        errors.push('Date of death must be after date of birth');
+    
+    if (birthDate && death) {
+      const birth = toDate(birthDate);
+      if (birth && death < birth) {
+        errors.push('Death date cannot be before birth date');
       }
     }
   }
@@ -127,220 +110,158 @@ const validateDates = (birthDate: Date | Timestamp | null, deathDate: Date | Tim
 
 export function EnhancedProfileForm({ universityId, profileId, onSuccess }: EnhancedProfileFormProps) {
   const { user } = useAuth();
-  const { isAdmin, isEditor } = usePermissions();
-  const [activeTab, setActiveTab] = useState<TabId>('basic');
+  const { hasPermission } = usePermissions();
   const { toast } = useToast();
-  const [showPublishDialog, setShowPublishDialog] = useState(false);
+  const params = useParams();
+  const [activeTab, setActiveTab] = useState<TabId>('basic');
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'draft' | 'published'>('draft');
   const [formData, setFormData] = useState<ProfileFormData>({
-    name: '',
+    full_name: '',
     type: 'personal',
     description: '',
-    imageUrl: '',
-    basicInfo: {
-      dateOfBirth: null,
-      dateOfDeath: null,
+    image_url: '',
+    basic_info: {
+      date_of_birth: null,
+      date_of_death: null,
       biography: '',
       photo: '',
-      birthLocation: '',
-      deathLocation: '',
+      birth_location: '',
+      death_location: ''
     },
-    lifeStory: {
-      content: '{}',
-      updatedAt: new Date(),
+    life_story: {
+      content: '',
+      updated_at: new Date().toISOString()
     },
     status: 'draft',
-    isPublic: false,
+    is_public: false,
     metadata: {
       tags: [],
       categories: [],
-      lastModifiedBy: '',
-      lastModifiedAt: Timestamp.fromDate(new Date()),
-      version: 1,
-    },
+      last_modified_by: user?.id || '',
+      last_modified_at: new Date().toISOString(),
+      version: 1
+    }
   });
-  const [fieldErrors, setFieldErrors] = useState<{
-    dateOfBirth?: string;
-    dateOfDeath?: string;
-  }>({});
-
-  // Autosave functionality
-  const debouncedSave = useCallback(
-    debounce(async (data: ProfileFormData) => {
-      try {
-        const { db } = await getFirebaseServices();
-        if (!db || !profileId) return;
-
-        const profileRef = doc(db, `universities/${universityId}/profiles/${profileId}`);
-        await updateDoc(profileRef, {
-          ...data,
-          updatedAt: new Date().toISOString(),
-          updatedBy: user?.uid || 'system'
-        });
-
-        console.log('Autosave successful');
-      } catch (error) {
-        console.error('Autosave failed:', error);
-        toast({
-          title: 'Warning',
-          description: 'Failed to autosave changes',
-          variant: 'destructive'
-        });
-      }
-    }, 30000),
-    [universityId, profileId, user?.uid]
-  );
-
-  // Save form data to localStorage and trigger autosave
-  useEffect(() => {
-    localStorage.setItem(`profile-form-${universityId}-${profileId || 'new'}`, JSON.stringify(formData));
-    if (profileId) {
-      debouncedSave(formData);
-    }
-  }, [formData, universityId, profileId, debouncedSave]);
-
-  useEffect(() => {
-    if (profileId) {
-      fetchProfile();
-    }
-  }, [profileId]);
 
   const fetchProfile = async () => {
-    try {
-      const { db } = await getFirebaseServices();
-      if (!db) return;
+    if (!profileId) return;
 
-      const profileRef = doc(db, `universities/${universityId}/profiles/${profileId}`);
-      const profileDoc = await getDoc(profileRef);
-      
-      if (profileDoc.exists()) {
-        const data = profileDoc.data() as ProfileFormData;
-        // Ensure lifeStory.content is a valid JSON string
-        if (data.lifeStory?.content) {
-          try {
-            JSON.parse(data.lifeStory.content);
-          } catch {
-            data.lifeStory.content = '{}';
+    try {
+      setLoading(true);
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', profileId)
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      if (profileData) {
+        setFormData({
+          full_name: profileData.full_name || '',
+          type: profileData.type || 'personal',
+          description: profileData.description || '',
+          image_url: profileData.image_url || '',
+          basic_info: {
+            date_of_birth: profileData.basic_info?.date_of_birth || null,
+            date_of_death: profileData.basic_info?.date_of_death || null,
+            biography: profileData.basic_info?.biography || '',
+            photo: profileData.basic_info?.photo || '',
+            birth_location: profileData.basic_info?.birth_location || '',
+            death_location: profileData.basic_info?.death_location || ''
+          },
+          life_story: {
+            content: profileData.life_story?.content || '',
+            updated_at: profileData.life_story?.updated_at || new Date().toISOString()
+          },
+          status: profileData.status || 'draft',
+          is_public: profileData.is_public || false,
+          metadata: profileData.metadata || {
+            tags: [],
+            categories: [],
+            last_modified_by: user?.id || '',
+            last_modified_at: new Date().toISOString(),
+            version: 1
           }
-        } else {
-          data.lifeStory = {
-            content: '{}',
-            updatedAt: new Date()
-          };
-        }
-        setFormData(data);
+        });
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch profile data',
+        description: 'Failed to load profile',
         variant: 'destructive'
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => {
-      const newData = { ...prev };
-      if (field === 'basicInfo') {
-        newData.basicInfo = {
-          ...prev.basicInfo,
-          ...value,
-          dateOfBirth: value.dateOfBirth instanceof Date ? value.dateOfBirth : null,
-          dateOfDeath: value.dateOfDeath instanceof Date ? value.dateOfDeath : null
-        };
-      } else if (field === 'lifeStory') {
-        // Ensure content is a valid JSON string
-        let content = value.content;
-        if (typeof content === 'object') {
-          content = JSON.stringify(content);
-        }
-        newData.lifeStory = {
-          ...prev.lifeStory,
-          ...value,
-          content,
-          updatedAt: new Date()
-        };
-      } else {
-        (newData as any)[field] = value;
-      }
-      return newData;
-    });
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   const handleFileUpload = async (file: File) => {
+    if (!user) return;
+
+    if (file.size > MAX_FILE_SIZE) {
+      toast({
+        title: 'Error',
+        description: 'File size must be less than 5MB',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+      toast({
+        title: 'Error',
+        description: 'Only JPEG, PNG, GIF, and WebP files are allowed',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setUploading(true);
     try {
-      // Validate file type
-      if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-        toast({
-          title: 'Error',
-          description: 'Invalid file type. Please upload a JPEG, PNG, GIF, or WebP image.',
-          variant: 'destructive'
-        });
-        return;
-      }
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `profiles/${profileId || 'temp'}/${fileName}`;
 
-      // Validate file size
-      if (file.size > MAX_FILE_SIZE) {
-        toast({
-          title: 'Error',
-          description: 'File is too large. Maximum size is 5MB.',
-          variant: 'destructive'
-        });
-        return;
-      }
+      const { data, error } = await supabase.storage
+        .from('media')
+        .upload(filePath, file);
 
-      // Validate image dimensions
-      const img = new Image();
-      const imgPromise = new Promise((resolve, reject) => {
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-      });
-      img.src = URL.createObjectURL(file);
-      
-      const loadedImg = await imgPromise as HTMLImageElement;
-      if (loadedImg.width < 200 || loadedImg.height < 200) {
-        toast({
-          title: 'Error',
-          description: 'Image dimensions must be at least 200x200 pixels.',
-          variant: 'destructive'
-        });
-        return;
-      }
+      if (error) throw error;
 
-      setUploading(true);
-      const { storage } = await getFirebaseServices();
-      if (!storage) {
-        toast({
-          title: 'Error',
-          description: 'Storage service is not available',
-          variant: 'destructive'
-        });
-        return;
-      }
+      const { data: { publicUrl } } = supabase.storage
+        .from('media')
+        .getPublicUrl(filePath);
 
-      const path = `universities/${universityId}/profiles/${profileId || 'new'}/photo/${file.name}`;
-      const storageRef = ref(storage, path);
-      
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
-
-      handleInputChange('basicInfo', {
-        ...formData.basicInfo,
-        photo: downloadURL
-      });
+      setFormData(prev => ({
+        ...prev,
+        image_url: publicUrl
+      }));
 
       toast({
         title: 'Success',
-        description: 'Photo uploaded successfully'
+        description: 'Image uploaded successfully',
+        variant: 'default'
       });
     } catch (error) {
       console.error('Error uploading file:', error);
       toast({
         title: 'Error',
-        description: 'Failed to upload file. Please try again.',
+        description: 'Failed to upload image',
         variant: 'destructive'
       });
     } finally {
@@ -348,135 +269,94 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
     }
   };
 
-  const handleDateChange = (field: 'dateOfBirth' | 'dateOfDeath', value: Date | undefined) => {
-    const dateValue = value || null;
-    const newBasicInfo = {
-      ...formData.basicInfo,
-      [field]: dateValue
-    };
-    
-    // Validate dates
-    const errors = validateDates(
-      field === 'dateOfBirth' ? dateValue : formData.basicInfo.dateOfBirth,
-      field === 'dateOfDeath' ? dateValue : formData.basicInfo.dateOfDeath
-    );
-    
-    // Update form data and errors
-    handleInputChange('basicInfo', newBasicInfo);
-    setFieldErrors(prev => ({
+  const handleDateChange = (field: 'date_of_birth' | 'date_of_death', value: Date | undefined) => {
+    setFormData(prev => ({
       ...prev,
-      [field]: errors.find(error => error.includes(field === 'dateOfBirth' ? 'birth' : 'death'))
+      basic_info: {
+        ...prev.basic_info,
+        [field]: value ? value.toISOString() : null
+      }
     }));
   };
 
   const validateForm = (): string[] => {
     const errors: string[] = [];
-    
-    // Validate required fields
-    if (!formData.name?.trim()) {
+
+    if (!formData.full_name.trim()) {
       errors.push('Name is required');
     }
-    
-    // Validate dates
-    errors.push(...validateDates(formData.basicInfo.dateOfBirth, formData.basicInfo.dateOfDeath));
-    
+
+    if (!formData.description.trim()) {
+      errors.push('Description is required');
+    }
+
+    const dateErrors = validateDates(
+      formData.basic_info.date_of_birth,
+      formData.basic_info.date_of_death
+    );
+    errors.push(...dateErrors);
+
     return errors;
   };
 
   const handleSubmit = async (status: 'draft' | 'published') => {
+    setSaveStatus(status);
+    setShowSaveDialog(true);
+  };
+
+  const submitForm = async (status: 'draft' | 'published') => {
     const errors = validateForm();
     if (errors.length > 0) {
       toast({
         title: 'Validation Error',
-        description: errors.join('\n'),
+        description: errors.join(', '),
         variant: 'destructive'
       });
       return;
     }
 
-    // Check permissions
-    if (status === 'published') {
-      const hasPermission = await isAdmin(universityId);
-      if (!hasPermission) {
-        toast({
-          title: 'Permission Denied',
-          description: 'Only admins can publish profiles',
-          variant: 'destructive'
-        });
-        return;
-      }
-      setShowPublishDialog(true);
-      return;
-    }
-
-    await submitForm(status);
-  };
-
-  const submitForm = async (status: 'draft' | 'published') => {
+    setSaving(true);
     try {
-      setLoading(true);
-      const { db } = await getFirebaseServices();
-      if (!db) return;
-
-      // Convert dates to Timestamps before saving
-      const profileData = {
+      const updateData = {
         ...formData,
         status,
-        updatedAt: Timestamp.now(),
-        updatedBy: user?.uid || 'system',
-        basicInfo: {
-          ...formData.basicInfo,
-          dateOfBirth: formData.basicInfo.dateOfBirth 
-            ? (formData.basicInfo.dateOfBirth instanceof Timestamp 
-              ? formData.basicInfo.dateOfBirth 
-              : Timestamp.fromDate(formData.basicInfo.dateOfBirth))
-            : null,
-          dateOfDeath: formData.basicInfo.dateOfDeath
-            ? (formData.basicInfo.dateOfDeath instanceof Timestamp
-              ? formData.basicInfo.dateOfDeath
-              : Timestamp.fromDate(formData.basicInfo.dateOfDeath))
-            : null
-        },
-        lifeStory: {
-          ...formData.lifeStory,
-          updatedAt: Timestamp.now()
-        },
+        updated_at: new Date().toISOString(),
         metadata: {
           ...formData.metadata,
-          lastModifiedBy: user?.uid || 'system',
-          lastModifiedAt: Timestamp.now(),
-          version: (formData.metadata.version || 0) + 1
+          last_modified_by: user?.id || '',
+          last_modified_at: new Date().toISOString()
         }
       };
 
       if (profileId) {
-        const profileRef = doc(db, `universities/${universityId}/profiles/${profileId}`);
-        await updateDoc(profileRef, profileData);
-        toast({
-          title: 'Success',
-          description: 'Profile updated successfully',
-        });
+        // Update existing profile
+        const { error } = await supabase
+          .from('profiles')
+          .update(updateData)
+          .eq('id', profileId);
+
+        if (error) throw error;
       } else {
-        const newProfileRef = doc(collection(db, `universities/${universityId}/profiles`));
-        await setDoc(newProfileRef, {
-          ...profileData,
-          id: newProfileRef.id,
-          createdAt: Timestamp.now(),
-          createdBy: user?.uid || 'system'
-        });
-        toast({
-          title: 'Success',
-          description: 'Profile created successfully',
-        });
+        // Create new profile
+        const { error } = await supabase
+          .from('profiles')
+          .insert([{
+            ...updateData,
+            university_id: universityId,
+            created_by: user?.id || '',
+            created_at: new Date().toISOString()
+          }]);
+
+        if (error) throw error;
       }
 
-      // Clear saved form data after successful submission
-      localStorage.removeItem(`profile-form-${universityId}-${profileId || 'new'}`);
+      toast({
+        title: 'Success',
+        description: `Profile ${status === 'published' ? 'published' : 'saved as draft'} successfully`,
+        variant: 'default'
+      });
 
-      // Only redirect if onSuccess is provided
-      if (onSuccess) {
-        onSuccess();
-      }
+      onSuccess?.();
     } catch (error) {
       console.error('Error saving profile:', error);
       toast({
@@ -485,7 +365,8 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
         variant: 'destructive'
       });
     } finally {
-      setLoading(false);
+      setSaving(false);
+      setShowSaveDialog(false);
     }
   };
 
@@ -560,28 +441,28 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
         </Button>
       </div>
 
-      <Dialog open={showPublishDialog} onOpenChange={setShowPublishDialog}>
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Publish Profile</DialogTitle>
+            <DialogTitle>Save Profile</DialogTitle>
             <DialogDescription>
-              Are you sure you want to publish this profile? Once published, it will be visible to all users.
+              Are you sure you want to save this profile as a {saveStatus}?
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-4 mt-4">
             <Button
               variant="outline"
-              onClick={() => setShowPublishDialog(false)}
+              onClick={() => setShowSaveDialog(false)}
             >
               Cancel
             </Button>
             <Button
               onClick={() => {
-                setShowPublishDialog(false);
-                submitForm('published');
+                setShowSaveDialog(false);
+                submitForm(saveStatus);
               }}
             >
-              Publish
+              Save
             </Button>
           </div>
         </DialogContent>

@@ -2,10 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getFirebaseServices } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { supabase } from '@/lib/supabase';
 import { Icon } from '@/components/ui/Icon';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import type { Profile, PersonalProfile, MemorialProfile } from '@/types/profile';
 import { CommentsSection } from '@/components/comments/CommentsSection';
 import { MediaGallery } from '@/components/media/MediaGallery';
@@ -15,7 +14,6 @@ import { RoleBasedUI } from '@/components/common/RoleBasedUI';
 import { EditorRequestButton } from '@/components/common/EditorRequestButton';
 import type { University } from '@/types/university';
 import { toast } from 'react-hot-toast';
-import { Timestamp } from 'firebase/firestore';
 import { TimelineView } from '@/components/timeline/TimelineView';
 import Link from 'next/link';
 import type { Memorial } from '@/types/memorial';
@@ -101,19 +99,9 @@ const RequestToJoinButton: React.FC<RequestToJoinButtonProps> = ({ universityId,
                 <button
                   type="button"
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm"
-                  onClick={() => {
-                    // TODO: sendVerificationEmail();
-                    setShowVerificationModal(false);
-                  }}
-                >
-                  Send Verification Email
-                </button>
-                <button
-                  type="button"
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                   onClick={() => setShowVerificationModal(false)}
                 >
-                  Cancel
+                  Close
                 </button>
               </div>
             </div>
@@ -124,23 +112,12 @@ const RequestToJoinButton: React.FC<RequestToJoinButtonProps> = ({ universityId,
   );
 };
 
-// Add type guard functions at the top of the file
-const isTimestamp = (value: unknown): value is Timestamp => {
-  return value instanceof Timestamp;
-};
-
-const isDate = (value: unknown): value is Date => {
-  return value instanceof Date;
-};
-
-const formatDate = (date: Timestamp | Date | null | undefined): string => {
-  if (!date) return 'Not specified';
+const formatDate = (date: string | null | undefined): string => {
+  if (!date) return 'N/A';
   try {
-    const dateObj = date instanceof Timestamp ? date.toDate() : date;
-    return dateObj instanceof Date ? dateObj.toLocaleDateString() : 'Invalid date';
-  } catch (error) {
-    console.error('Error formatting date:', error);
-    return 'Invalid date';
+    return new Date(date).toLocaleDateString();
+  } catch {
+    return 'Invalid Date';
   }
 };
 
@@ -148,79 +125,51 @@ export default function ProfilePage() {
   const { id } = useParams();
   const router = useRouter();
   const { user } = useAuth();
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [university, setUniversity] = useState<University | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [profile, setProfile] = useState<PersonalProfile | MemorialProfile | null>(null);
-  const [university, setUniversity] = useState<University | null>(null);
-  const [memorials, setMemorials] = useState<MemorialPreview[]>([]);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authAction, setAuthAction] = useState<'view' | 'edit' | 'comment'>('view');
 
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        console.log('Loading profile data for ID:', id);
-        const services = await getFirebaseServices();
-        
-        // First try loading from the university-specific collection
-        const universityId = id.split('/')[0];
-        const profileId = id.split('/').pop();
-        
-        if (universityId && profileId) {
-          console.log('Loading from university collection:', universityId, profileId);
-          const profileRef = doc(services.db, `universities/${universityId}/profiles`, profileId);
-          const profileDoc = await getDoc(profileRef);
-          
-          if (profileDoc.exists()) {
-            const profileData = {
-              id: profileDoc.id,
-              ...profileDoc.data()
-            } as any;
-            
-            console.log('Found profile in university collection:', profileData);
-            setProfile(profileData);
-            setLoading(false);
-            return;
-          }
+        setLoading(true);
+        setError(null);
+
+        // Fetch profile data
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (profileError) {
+          throw profileError;
         }
-        
-        // If not found in university collection, try the global profiles collection
-        console.log('Trying global profiles collection');
-        const profileRef = doc(services.db, 'profiles', id);
-        const profileDoc = await getDoc(profileRef);
-        
-        if (!profileDoc.exists()) {
-          console.error('Profile not found:', id);
+
+        if (!profileData) {
           setError('Profile not found');
-          setLoading(false);
           return;
         }
 
-        const profileData = {
-          id: profileDoc.id,
-          ...profileDoc.data()
-        } as any;
+        setProfile(profileData as ProfileData);
 
-        console.log('Found profile in global collection:', profileData);
-        setProfile(profileData);
-        
-        // If this is a memorial profile, load the university data
-        if (profileData.type === 'memorial' && profileData.universityId) {
-          const universityRef = doc(services.db, 'universities', profileData.universityId);
-          const universityDoc = await getDoc(universityRef);
-          
-          if (universityDoc.exists()) {
-            setUniversity({
-              id: universityDoc.id,
-              ...universityDoc.data()
-            } as University);
+        // Fetch university data if profile has university_id
+        if (profileData.university_id) {
+          const { data: universityData, error: universityError } = await supabase
+            .from('universities')
+            .select('*')
+            .eq('id', profileData.university_id)
+            .single();
+
+          if (!universityError && universityData) {
+            setUniversity(universityData as University);
           }
         }
-        
-        setLoading(false);
       } catch (error) {
         console.error('Error loading profile:', error);
-        setError('Error loading profile');
+        setError('Failed to load profile');
+      } finally {
         setLoading(false);
       }
     };
@@ -231,45 +180,73 @@ export default function ProfilePage() {
   }, [id]);
 
   const handleAuthRequired = (action: 'view' | 'edit' | 'comment') => {
-    setAuthAction(action);
-    setShowAuthModal(true);
+    toast.error(`Please sign in to ${action} this profile`);
+    router.push('/auth/login');
   };
 
   const handleEditorRequest = async (reason: string) => {
+    if (!user || !profile) return;
+
     try {
-      // Show success message
+      const { error } = await supabase
+        .from('editor_requests')
+        .insert([{
+          profile_id: profile.id,
+          user_id: user.id,
+          reason: reason,
+          status: 'pending'
+        }]);
+
+      if (error) throw error;
+      toast.success('Editor request submitted successfully');
     } catch (error) {
-      console.error('Error requesting editor access:', error);
-      // Show error message
+      console.error('Error submitting editor request:', error);
+      toast.error('Failed to submit editor request');
     }
   };
 
   const handleApproveEditor = async (userId: string) => {
+    if (!profile) return;
+
     try {
-      // Show success message
+      const { error } = await supabase
+        .from('profile_collaborators')
+        .insert([{
+          profile_id: profile.id,
+          user_id: userId,
+          role: 'editor',
+          granted_at: new Date().toISOString()
+        }]);
+
+      if (error) throw error;
+      toast.success('Editor approved successfully');
     } catch (error) {
-      console.error('Error approving editor access:', error);
-      // Show error message
+      console.error('Error approving editor:', error);
+      toast.error('Failed to approve editor');
     }
   };
 
   const handleRejectEditor = async (userId: string) => {
     try {
-      // Show success message
+      const { error } = await supabase
+        .from('editor_requests')
+        .update({ status: 'rejected' })
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      toast.success('Editor request rejected');
     } catch (error) {
-      console.error('Error rejecting editor access:', error);
-      // Show error message
+      console.error('Error rejecting editor:', error);
+      toast.error('Failed to reject editor request');
     }
   };
 
   const handleEdit = () => {
-    if (!profile) return;
-    
-    if (profile.type === 'memorial' && (profile as MemorialProfile).universityId) {
-      router.push(`/admin/universities/${(profile as MemorialProfile).universityId}/profiles/${id}/edit`);
-    } else {
-      router.push(`/profile/${id}/edit`);
+    if (!user) {
+      handleAuthRequired('edit');
+      return;
     }
+    router.push(`/profile/${id}/edit`);
   };
 
   if (loading) {

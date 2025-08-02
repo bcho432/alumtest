@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { getFirebaseServices } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import { Button } from './Button';
 import { Icon } from './Icon';
 import { Spinner } from './Spinner';
@@ -36,20 +35,26 @@ export function ImageUpload({ currentImage, onUpload, aspectRatio = 1, className
       setUploading(true);
       setError(null);
 
-      const { storage } = await getFirebaseServices();
-      if (!storage) {
-        throw new Error('Storage is not initialized');
+      // Create a unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `uploads/${fileName}`;
+
+      // Upload to Supabase Storage
+      const { data, error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        throw uploadError;
       }
 
-      // Create a unique filename
-      const filename = `${Date.now()}-${file.name}`;
-      const storageRef = ref(storage, `universities/${filename}`);
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('media')
+        .getPublicUrl(filePath);
 
-      // Upload file
-      const snapshot = await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(snapshot.ref);
-
-      onUpload(url);
+      onUpload(publicUrl);
     } catch (err) {
       console.error('Error uploading image:', err);
       setError('Failed to upload image. Please try again.');

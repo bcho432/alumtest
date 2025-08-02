@@ -5,7 +5,7 @@ import { Icon } from '@/components/ui/Icon';
 import { AnimatedBlobs } from '@/components/ui/AnimatedBlobs';
 import { FeaturedUniversities } from '@/components/university/FeaturedUniversities';
 import { SearchBar } from '@/components/common/SearchBar';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
 
 export default function Home() {

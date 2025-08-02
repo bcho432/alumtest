@@ -5,9 +5,7 @@ import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/hooks/useAuth';
 import { useCreateProfile } from '@/hooks/useCreateProfile';
 import { toast } from 'react-hot-toast';
-import { Timestamp } from 'firebase/firestore';
-import { doc, getDoc, collection, setDoc, writeBatch } from 'firebase/firestore';
-import { getFirebaseServices } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 
 interface CreateProfileButtonProps {
   universityId: string;
@@ -24,20 +22,21 @@ export const CreateProfileButton: React.FC<CreateProfileButtonProps> = ({
   const { user } = useAuth();
   const { createProfile, loading } = useCreateProfile();
 
-  const pollForProfile = useCallback(async (profileId: string, collectionPath: string) => {
-    const { db } = await getFirebaseServices();
-    const profileRef = doc(db, collectionPath, profileId);
-    
-    const maxAttempts = 10; // Increased from 5 to 10
-    const pollInterval = 2000; // Increased from 1s to 2s
+  const pollForProfile = useCallback(async (profileId: string) => {
+    const maxAttempts = 10;
+    const pollInterval = 2000;
     let attempts = 0;
 
     while (attempts < maxAttempts) {
       console.log(`[CreateProfileButton] Polling attempt ${attempts + 1}/${maxAttempts}`);
       try {
-        const profileDoc = await getDoc(profileRef);
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', profileId)
+          .single();
         
-        if (profileDoc.exists()) {
+        if (!error && data) {
           console.log('[CreateProfileButton] Profile found in database');
           return true;
         }
@@ -67,114 +66,50 @@ export const CreateProfileButton: React.FC<CreateProfileButtonProps> = ({
       
       // Create the profile
       const profileId = await createProfile({
-        universityId,
+        university_id: universityId,
         type: profileType,
         status: 'draft',
-        createdBy: user.uid,
-        updatedBy: user.uid,
-        name: '',
+        created_by: user.id,
+        updated_by: user.id,
+        full_name: '',
         description: '',
-        imageUrl: '',
-        basicInfo: {
-          dateOfBirth: null,
-          dateOfDeath: null,
+        image_url: '',
+        basic_info: {
+          date_of_birth: null,
+          date_of_death: null,
           biography: '',
           photo: '',
-          birthLocation: '',
-          deathLocation: ''
+          birth_location: '',
+          death_location: ''
         },
-        lifeStory: {
+        life_story: {
           content: '',
-          updatedAt: Timestamp.now()
+          updated_at: new Date().toISOString()
         },
-        isPublic: false,
+        is_public: false,
         metadata: {
           tags: [],
           categories: [],
-          lastModifiedBy: user.uid,
-          lastModifiedAt: Timestamp.now(),
+          last_modified_by: user.id,
+          last_modified_at: new Date().toISOString(),
           version: 1
         }
       });
 
       console.log('[CreateProfileButton] Profile created with ID:', profileId);
-
-      // Determine the collection path
-      const collectionPath = profileType === 'memorial' 
-        ? `universities/${universityId}/profiles`
-        : 'profiles';
-      
-      console.log('[CreateProfileButton] Checking profile in collection:', collectionPath);
-      
-      // Initialize the timeline subcollection
-      const { db } = await getFirebaseServices();
-      if (!db) {
-        throw new Error('Database not initialized');
-      }
-
-      const batch = writeBatch(db);
-      
-      // Create the main profile document
-      const profileRef = doc(db, collectionPath, profileId);
-      batch.set(profileRef, {
-        id: profileId,
-        universityId,
-        type: profileType,
-        status: 'draft',
-        createdBy: user.uid,
-        updatedBy: user.uid,
-        name: '',
-        description: '',
-        imageUrl: '',
-        basicInfo: {
-          dateOfBirth: null,
-          dateOfDeath: null,
-          biography: '',
-          photo: '',
-          birthLocation: '',
-          deathLocation: ''
-        },
-        lifeStory: {
-          content: '',
-          updatedAt: Timestamp.now()
-        },
-        isPublic: false,
-        metadata: {
-          tags: [],
-          categories: [],
-          lastModifiedBy: user.uid,
-          lastModifiedAt: Timestamp.now(),
-          version: 1
-        }
-      });
-
-      // Initialize the timeline subcollection
-      const timelineRef = collection(db, collectionPath, profileId, 'timeline');
-      const initialTimelineDoc = doc(timelineRef);
-      batch.set(initialTimelineDoc, {
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-        type: 'initialization',
-        title: 'Profile Created',
-        description: 'Profile timeline initialized',
-        startDate: Timestamp.now().toDate().toISOString(),
-      });
-
-      // Commit the batch
-      await batch.commit();
       
       // Poll for the profile to be saved
-      const profileExists = await pollForProfile(profileId, collectionPath);
+      const profileExists = await pollForProfile(profileId);
       
       if (profileExists) {
         const targetPath = profileType === 'memorial'
-          ? `/${universityId}/memorials/${profileId}/edit`
-          : `/${universityId}/profiles/${profileId}/edit`;
+          ? `/university/${universityId}/memorials/${profileId}/edit`
+          : `/university/${universityId}/profiles/${profileId}/edit`;
         
         console.log('[CreateProfileButton] Redirecting to:', targetPath);
         
-        // Use window.location for navigation
-        window.location.href = targetPath;
+        // Use router for navigation
+        router.push(targetPath);
       } else {
         console.log('[CreateProfileButton] Profile not found after all attempts');
         toast.error('Profile creation is taking longer than expected. Please try refreshing the page.');

@@ -3,14 +3,12 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { handleFirebaseError } from '@/lib/errors';
 import type { SignUpFormData } from '@/types/auth';
-import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+// Firebase imports removed - using Supabase auth now
 
 export default function UniversitySignUpPage() {
   const [step, setStep] = useState(1);
@@ -22,7 +20,7 @@ export default function UniversitySignUpPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { signUp } = useAuth();
+  const { signup } = useAuth();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -62,29 +60,13 @@ export default function UniversitySignUpPage() {
         }
       } else {
         if (validateStep2()) {
-          const userCredential = await createUserWithEmailAndPassword(getAuth(), form.email, form.password);
-          const user = userCredential.user;
+          await signup(form.email, form.password);
+          // Note: We'll need to get the user from the auth context after signup
+          // For now, we'll redirect to the university page
 
-          // Create university document
-          const universityData = {
-            name: '',
-            type: 'university',
-            description: '',
-            location: '',
-            website: '',
-            adminIds: [user.uid],
-            memberIds: [],
-            communityPageUrl: `/university/${user.uid}`,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          };
-
-          if (!db) throw new Error('Firestore db is not initialized');
-
-          await setDoc(doc(db, 'universities', user.uid), universityData);
-
-          // Redirect to university page
-          router.push(`/university/${user.uid}`);
+          // Note: University creation will be handled by the Supabase service layer
+          // For now, redirect to dashboard
+          router.push('/dashboard');
         }
       }
     } catch (error) {

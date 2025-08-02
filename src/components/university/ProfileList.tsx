@@ -4,21 +4,20 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import { getFirebaseServices } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, orderBy, limit, startAfter } from 'firebase/firestore';
+import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/toast';
 import Link from 'next/link';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/Dialog';
 
 interface Profile {
   id: string;
-  name: string;
+  full_name: string;
   type: 'memorial' | 'living';
   status: 'draft' | 'published' | 'pending_review';
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: string;
-  updatedBy: string;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by: string;
 }
 
 interface ProfileListProps {
@@ -31,7 +30,6 @@ export function ProfileList({ universityId }: ProfileListProps) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'draft' | 'published' | 'pending_review'>('all');
-  const [lastDoc, setLastDoc] = useState<any>(null);
   const [hasMore, setHasMore] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [profileToDelete, setProfileToDelete] = useState<string | null>(null);
@@ -43,36 +41,29 @@ export function ProfileList({ universityId }: ProfileListProps) {
 
   const fetchProfiles = async (isLoadMore = false) => {
     try {
-      const { db } = await getFirebaseServices();
-      if (!db) return;
-
-      let q = query(
-        collection(db, `universities/${universityId}/profiles`),
-        orderBy('createdAt', 'desc'),
-        limit(ITEMS_PER_PAGE)
-      );
+      let query = supabase
+        .from('profiles')
+        .select('*')
+        .eq('university_id', universityId)
+        .order('created_at', { ascending: false })
+        .limit(ITEMS_PER_PAGE);
 
       if (filter !== 'all') {
-        q = query(q, where('status', '==', filter));
+        query = query.eq('status', filter);
       }
 
-      if (isLoadMore && lastDoc) {
-        q = query(q, startAfter(lastDoc));
+      const { data: profilesData, error } = await query;
+
+      if (error) {
+        throw error;
       }
 
-      const profilesSnapshot = await getDocs(q);
-      const profilesData = profilesSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Profile[];
-
-      setLastDoc(profilesSnapshot.docs[profilesSnapshot.docs.length - 1]);
-      setHasMore(profilesSnapshot.docs.length === ITEMS_PER_PAGE);
+      setHasMore((profilesData || []).length === ITEMS_PER_PAGE);
 
       if (isLoadMore) {
-        setProfiles(prev => [...prev, ...profilesData]);
+        setProfiles(prev => [...prev, ...(profilesData || [])]);
       } else {
-        setProfiles(profilesData);
+        setProfiles(profilesData || []);
       }
     } catch (error) {
       console.error('Error fetching profiles:', error);
@@ -88,54 +79,60 @@ export function ProfileList({ universityId }: ProfileListProps) {
 
   const handleStatusChange = async (profileId: string, newStatus: Profile['status']) => {
     try {
-      const { db } = await getFirebaseServices();
-      if (!db) return;
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', profileId);
 
-      const profileRef = doc(db, `universities/${universityId}/profiles/${profileId}`);
-      await updateDoc(profileRef, {
-        status: newStatus,
-        updatedAt: new Date()
-      });
+      if (error) throw error;
 
       setProfiles(profiles.map(profile => 
-        profile.id === profileId ? { ...profile, status: newStatus } : profile
+        profile.id === profileId 
+          ? { ...profile, status: newStatus, updated_at: new Date().toISOString() }
+          : profile
       ));
 
       toast({
         title: 'Success',
-        description: 'Profile status updated successfully'
+        description: 'Profile status updated successfully',
+        variant: 'default'
       });
     } catch (error) {
       console.error('Error updating profile status:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update profile status. Please try again.',
+        description: 'Failed to update profile status',
         variant: 'destructive'
       });
     }
   };
 
   const handleDeleteProfile = async (profileId: string) => {
+    setIsDeleting(true);
     try {
-      setIsDeleting(true);
-      const { db } = await getFirebaseServices();
-      if (!db) return;
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', profileId);
 
-      const profileRef = doc(db, `universities/${universityId}/profiles/${profileId}`);
-      await deleteDoc(profileRef);
+      if (error) throw error;
 
       setProfiles(profiles.filter(profile => profile.id !== profileId));
       setProfileToDelete(null);
 
       toast({
         title: 'Success',
-        description: 'Profile deleted successfully'
+        description: 'Profile deleted successfully',
+        variant: 'default'
       });
     } catch (error) {
       console.error('Error deleting profile:', error);
       toast({
         title: 'Error',
-        description: 'Failed to delete profile. Please try again.',
+        description: 'Failed to delete profile',
         variant: 'destructive'
       });
     } finally {
@@ -198,7 +195,7 @@ export function ProfileList({ universityId }: ProfileListProps) {
                   />
                 </div>
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900">{profile.name}</h3>
+                  <h3 className="text-lg font-medium text-gray-900">{profile.full_name}</h3>
                   <p className="text-sm text-gray-500">
                     {profile.type === 'memorial' ? 'Memorial' : 'Living'} Profile
                   </p>
@@ -219,10 +216,10 @@ export function ProfileList({ universityId }: ProfileListProps) {
 
             <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
               <div>
-                Created: {new Date(profile.createdAt).toLocaleDateString()}
+                Created: {new Date(profile.created_at).toLocaleDateString()}
               </div>
               <div>
-                Updated: {new Date(profile.updatedAt).toLocaleDateString()}
+                Updated: {new Date(profile.updated_at).toLocaleDateString()}
               </div>
             </div>
 

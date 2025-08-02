@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
-import { getFirebaseServices } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import { Card } from './Card';
 import { Button } from './Button';
 import { Input } from './Input';
@@ -12,17 +11,17 @@ import { Select } from './Select';
 
 interface User {
   id: string;
-  name: string;
+  display_name: string;
   email: string;
   role: 'admin' | 'editor' | 'viewer';
   status: 'active' | 'pending' | 'inactive';
-  lastActive?: Date;
-  createdAt: Date;
+  last_active?: string;
+  created_at: string;
   permissions: {
-    canManageProfiles: boolean;
-    canManageMemorials: boolean;
-    canManageUsers: boolean;
-    canManageSettings: boolean;
+    can_manage_profiles: boolean;
+    can_manage_memorials: boolean;
+    can_manage_users: boolean;
+    can_manage_settings: boolean;
   };
 }
 
@@ -48,28 +47,18 @@ export function UserManagement({ universityId, onUpdate }: UserManagementProps) 
       setLoading(true);
       setError(null);
 
-      const { db } = await getFirebaseServices();
-      if (!db) {
-        throw new Error('Database is not initialized');
+      const { data: usersData, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('university_id', universityId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        throw error;
       }
 
-      const usersRef = collection(db, 'users');
-      const q = query(
-        usersRef,
-        where('universityId', '==', universityId),
-        orderBy('createdAt', 'desc'),
-        limit(50)
-      );
-
-      const snapshot = await getDocs(q);
-      const usersData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate(),
-        lastActive: doc.data().lastActive?.toDate()
-      })) as User[];
-
-      setUsers(usersData);
+      setUsers(usersData || []);
     } catch (err) {
       console.error('Error loading users:', err);
       setError('Failed to load users. Please try again.');
@@ -98,53 +87,28 @@ export function UserManagement({ universityId, onUpdate }: UserManagementProps) 
     );
   };
 
-  const handleRoleChange = async (userId: string, newRole: User['role']) => {
-    try {
-      const { db } = await getFirebaseServices();
-      if (!db) {
-        throw new Error('Database is not initialized');
-      }
-
-      const userRef = doc(db, 'users', userId);
-      await updateDoc(userRef, {
-        role: newRole,
-        permissions: getDefaultPermissions(newRole)
-      });
-
-      toast({
-        title: 'Role updated',
-        description: 'User role has been updated successfully.',
-        variant: 'success'
-      });
-
-      await loadUsers();
-    } catch (err) {
-      console.error('Error updating user role:', err);
-      toast({
-        title: 'Error',
-        description: 'Failed to update user role. Please try again.',
-        variant: 'destructive'
-      });
-    }
-  };
-
   const handleStatusChange = async (userId: string, newStatus: User['status']) => {
     try {
-      const { db } = await getFirebaseServices();
-      if (!db) {
-        throw new Error('Database is not initialized');
-      }
+      const { error } = await supabase
+        .from('users')
+        .update({ status: newStatus })
+        .eq('id', userId);
 
-      const userRef = doc(db, 'users', userId);
-      await updateDoc(userRef, { status: newStatus });
+      if (error) throw error;
+
+      setUsers(prev => prev.map(user => 
+        user.id === userId 
+          ? { ...user, status: newStatus }
+          : user
+      ));
 
       toast({
-        title: 'Status updated',
-        description: 'User status has been updated successfully.',
-        variant: 'success'
+        title: 'User updated',
+        description: `User status has been updated to ${newStatus}.`,
+        variant: 'default'
       });
 
-      await loadUsers();
+      onUpdate();
     } catch (err) {
       console.error('Error updating user status:', err);
       toast({
@@ -155,34 +119,78 @@ export function UserManagement({ universityId, onUpdate }: UserManagementProps) 
     }
   };
 
+  const handleRoleChange = async (userId: string, newRole: User['role']) => {
+    try {
+      const permissions = getDefaultPermissions(newRole);
+      
+      const { error } = await supabase
+        .from('users')
+        .update({ 
+          role: newRole,
+          permissions
+        })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      setUsers(prev => prev.map(user => 
+        user.id === userId 
+          ? { ...user, role: newRole, permissions }
+          : user
+      ));
+
+      toast({
+        title: 'User updated',
+        description: `User role has been updated to ${newRole}.`,
+        variant: 'default'
+      });
+
+      onUpdate();
+    } catch (err) {
+      console.error('Error updating user role:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to update user role. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const getDefaultPermissions = (role: User['role']) => {
     switch (role) {
       case 'admin':
         return {
-          canManageProfiles: true,
-          canManageMemorials: true,
-          canManageUsers: true,
-          canManageSettings: true
+          can_manage_profiles: true,
+          can_manage_memorials: true,
+          can_manage_users: true,
+          can_manage_settings: true
         };
       case 'editor':
         return {
-          canManageProfiles: true,
-          canManageMemorials: true,
-          canManageUsers: false,
-          canManageSettings: false
+          can_manage_profiles: true,
+          can_manage_memorials: true,
+          can_manage_users: false,
+          can_manage_settings: false
         };
       case 'viewer':
         return {
-          canManageProfiles: false,
-          canManageMemorials: false,
-          canManageUsers: false,
-          canManageSettings: false
+          can_manage_profiles: false,
+          can_manage_memorials: false,
+          can_manage_users: false,
+          can_manage_settings: false
+        };
+      default:
+        return {
+          can_manage_profiles: false,
+          can_manage_memorials: false,
+          can_manage_users: false,
+          can_manage_settings: false
         };
     }
   };
 
   const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -273,7 +281,7 @@ export function UserManagement({ universityId, onUpdate }: UserManagementProps) 
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">
-                          {user.name}
+                          {user.display_name}
                         </div>
                       </div>
                     </div>
@@ -307,23 +315,23 @@ export function UserManagement({ universityId, onUpdate }: UserManagementProps) 
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      {user.lastActive
-                        ? new Date(user.lastActive).toLocaleDateString()
+                      {user.last_active
+                        ? new Date(user.last_active).toLocaleDateString()
                         : 'Never'}
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-2">
-                      {user.permissions.canManageProfiles && (
+                      {user.permissions.can_manage_profiles && (
                         <Badge variant="secondary">Profiles</Badge>
                       )}
-                      {user.permissions.canManageMemorials && (
+                      {user.permissions.can_manage_memorials && (
                         <Badge variant="secondary">Memorials</Badge>
                       )}
-                      {user.permissions.canManageUsers && (
+                      {user.permissions.can_manage_users && (
                         <Badge variant="secondary">Users</Badge>
                       )}
-                      {user.permissions.canManageSettings && (
+                      {user.permissions.can_manage_settings && (
                         <Badge variant="secondary">Settings</Badge>
                       )}
                     </div>

@@ -1,13 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { useUserRoles } from '@/hooks/useUserRoles';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
 import { toast } from 'react-hot-toast';
-import { collection, query, where, orderBy, onSnapshot, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import type { Comment } from '@/types/comments';
 
 interface CommentsSectionProps {
@@ -26,45 +25,69 @@ export function CommentsSection({ profileId, comments, onAddComment, className }
 
   useEffect(() => {
     if (!profileId) return;
-    if (!db) {
-      toast.error('Database not initialized');
-      setIsLoading(false);
-      return;
-    }
-    const q = query(
-      collection(db, 'profiles', profileId, 'content', 'comments'),
-      orderBy('createdAt', 'desc')
-    );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const loadedComments = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Comment[];
-      onAddComment(loadedComments);
-      setIsLoading(false);
-    });
+    const fetchComments = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('comments')
+          .select('*')
+          .eq('profile_id', profileId)
+          .order('created_at', { ascending: false });
 
-    return () => unsubscribe();
+        if (error) {
+          console.error('Error fetching comments:', error);
+          toast.error('Failed to load comments');
+        } else {
+          onAddComment(data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching comments:', error);
+        toast.error('Failed to load comments');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchComments();
+
+    // Set up real-time subscription
+    const subscription = supabase
+      .channel('comments')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'comments', filter: `profile_id=eq.${profileId}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            onAddComment([payload.new as Comment, ...comments]);
+          } else if (payload.eventType === 'DELETE') {
+            onAddComment(comments.filter(c => c.id !== payload.old.id));
+          } else if (payload.eventType === 'UPDATE') {
+            onAddComment(comments.map(c => c.id === payload.new.id ? payload.new as Comment : c));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [profileId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !newComment.trim()) return;
-    if (!db) {
-      toast.error('Database not initialized');
-      return;
-    }
 
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, 'profiles', profileId, 'content', 'comments'), {
-        content: newComment.trim(),
-        userId: user.uid,
-        userEmail: user.email,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
+      const { error } = await supabase
+        .from('comments')
+        .insert([{
+          profile_id: profileId,
+          content: newComment.trim(),
+          user_id: user.id,
+          user_email: user.email
+        }]);
+
+      if (error) throw error;
 
       setNewComment('');
       toast.success('Comment posted successfully');
@@ -78,13 +101,14 @@ export function CommentsSection({ profileId, comments, onAddComment, className }
 
   const handleDelete = async (commentId: string) => {
     if (!user) return;
-    if (!db) {
-      toast.error('Database not initialized');
-      return;
-    }
 
     try {
-      await deleteDoc(doc(db, 'profiles', profileId, 'content', 'comments', commentId));
+      const { error } = await supabase
+        .from('comments')
+        .delete()
+        .eq('id', commentId);
+
+      if (error) throw error;
       toast.success('Comment deleted successfully');
     } catch (error) {
       console.error('Error deleting comment:', error);
@@ -94,17 +118,17 @@ export function CommentsSection({ profileId, comments, onAddComment, className }
 
   const handleEdit = async (commentId: string, newContent: string) => {
     if (!user) return;
-    if (!db) {
-      toast.error('Database not initialized');
-      return;
-    }
 
     try {
-      await updateDoc(doc(db, 'profiles', profileId, 'content', 'comments', commentId), {
-        content: newContent.trim(),
-        updatedAt: serverTimestamp(),
-        isEdited: true
-      });
+      const { error } = await supabase
+        .from('comments')
+        .update({ 
+          content: newContent,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', commentId);
+
+      if (error) throw error;
       toast.success('Comment updated successfully');
     } catch (error) {
       console.error('Error updating comment:', error);
@@ -144,15 +168,15 @@ export function CommentsSection({ profileId, comments, onAddComment, className }
           <div key={comment.id} className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
             <div className="flex justify-between items-start mb-2">
               <div>
-                <p className="font-medium">{comment.userEmail}</p>
+                <p className="font-medium">{comment.user_email}</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {comment.createdAt instanceof Timestamp 
-                    ? comment.createdAt.toDate().toLocaleString()
-                    : new Date(comment.createdAt).toLocaleString()}
-                  {comment.isEdited && ' (edited)'}
+                  {comment.created_at 
+                    ? new Date(comment.created_at).toLocaleString()
+                    : new Date(comment.created_at).toLocaleString()}
+                  {comment.is_edited && ' (edited)'}
                 </p>
               </div>
-              {(user?.uid === comment.userId || roles[profileId] === 'admin') && (
+              {(user?.id === comment.user_id || roles[profileId] === 'admin') && (
                 <div className="flex gap-2">
                   <Button
                     variant="ghost"

@@ -1,6 +1,6 @@
 'use client';
 
-import { AuthProvider } from '@/contexts/AuthContext';
+import { SupabaseAuthProvider } from '@/contexts/SupabaseAuthContext';
 import { Toaster } from '@/components/ui/toaster';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -19,12 +19,12 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
+      <SupabaseAuthProvider>
         <ToastProvider>
           {children}
           <Toaster />
         </ToastProvider>
-      </AuthProvider>
+      </SupabaseAuthProvider>
     </QueryClientProvider>
   );
 } 

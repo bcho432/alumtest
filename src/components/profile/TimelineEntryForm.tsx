@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { useForm, Controller, FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/hooks/usePermissions';
 import { TimelineEntryType, TimelineEntry } from '@/types/profile';
 import { useToast } from '@/hooks/useToast';
@@ -83,34 +82,34 @@ export const TimelineEntryForm: React.FC<TimelineEntryFormProps> = ({
       return;
     }
     try {
-      if (!db) {
-        showToast({
-          title: 'Error',
-          description: 'Database is not initialized.',
-          status: 'error'
-        });
-        return;
-      }
-      const timelineRef = collection(db, 'profiles', profileId, 'timeline');
-      const entryData: any = {
+      const entryData = {
+        profile_id: profileId,
         ...values,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
-      const docRef = await addDoc(timelineRef, entryData);
-      if (onEntryAdded) {
-        onEntryAdded({ id: docRef.id, ...entryData });
-      }
+
+      const { data, error } = await supabase
+        .from('timeline_entries')
+        .insert([entryData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
       showToast({
         title: 'Success',
-        description: 'Entry added successfully!',
+        description: 'Timeline entry added successfully.',
         status: 'success'
       });
-      form.reset({ type } as TimelineEntryFormValues);
-    } catch (err) {
+
+      form.reset();
+      onEntryAdded?.(data as TimelineEntry);
+    } catch (error) {
+      console.error('Error adding timeline entry:', error);
       showToast({
         title: 'Error',
-        description: 'Failed to add entry.',
+        description: 'Failed to add timeline entry. Please try again.',
         status: 'error'
       });
     }

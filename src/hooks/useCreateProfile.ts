@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { getFirebaseServices } from '@/lib/firebase';
-import { collection, doc, setDoc, Timestamp, writeBatch } from 'firebase/firestore';
+import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 import { MemorialProfile, PersonalProfile } from '../types/profile';
 import { useAuth } from './useAuth';
@@ -8,32 +7,32 @@ import { useToast } from './useToast';
 import { useAnalytics } from './useAnalytics';
 
 interface CreateProfileParams {
-  universityId: string;
+  university_id: string;
   type: 'personal' | 'memorial';
   status: 'draft' | 'published';
-  createdBy: string;
-  updatedBy: string;
-  name?: string;
+  created_by: string;
+  updated_by: string;
+  full_name?: string;
   description?: string;
-  imageUrl?: string;
-  basicInfo?: {
-    dateOfBirth?: Date | Timestamp | null;
-    dateOfDeath?: Date | Timestamp | null;
+  image_url?: string;
+  basic_info?: {
+    date_of_birth?: Date | string | null;
+    date_of_death?: Date | string | null;
     biography?: string;
     photo?: string;
-    birthLocation?: string;
-    deathLocation?: string;
+    birth_location?: string;
+    death_location?: string;
   };
-  lifeStory?: {
+  life_story?: {
     content?: string;
-    updatedAt?: Date | Timestamp;
+    updated_at?: Date | string;
   };
-  isPublic?: boolean;
+  is_public?: boolean;
   metadata?: {
     tags?: string[];
     categories?: string[];
-    lastModifiedBy?: string;
-    lastModifiedAt?: Timestamp;
+    last_modified_by?: string;
+    last_modified_at?: string;
     version?: number;
   };
 }
@@ -54,69 +53,55 @@ export function useCreateProfile() {
 
     try {
       setLoading(true);
-      const { db } = await getFirebaseServices();
-      if (!db) {
-        console.error('useCreateProfile: Database not initialized');
-        throw new Error('Database not initialized');
-      }
-
       const profileId = uuidv4();
       console.log('useCreateProfile: Generated profile ID', profileId);
 
-      // Determine the collection path based on profile type
-      const collectionPath = params.type === 'memorial' 
-        ? `universities/${params.universityId}/profiles`
-        : 'profiles';
-      
-      const profileRef = doc(db, collectionPath, profileId);
-      console.log('useCreateProfile: Created profile reference', collectionPath);
-
       const baseProfileData = {
         id: profileId,
-        universityId: params.universityId,
+        university_id: params.university_id,
         status: params.status,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-        createdBy: params.createdBy,
-        updatedBy: params.updatedBy,
-        isPublic: params.isPublic || false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        created_by: params.created_by,
+        updated_by: params.updated_by,
+        is_public: params.is_public || false,
         metadata: {
           tags: params.metadata?.tags || [],
           categories: params.metadata?.categories || [],
-          lastModifiedBy: params.metadata?.lastModifiedBy || params.updatedBy,
-          lastModifiedAt: Timestamp.now(),
+          last_modified_by: params.metadata?.last_modified_by || params.updated_by,
+          last_modified_at: new Date().toISOString(),
           version: params.metadata?.version || 1
         }
       };
 
-      let profileData: MemorialProfile | PersonalProfile;
+      let profileData: any;
 
       if (params.type === 'memorial') {
         profileData = {
           ...baseProfileData,
           type: 'memorial',
-          universityId: params.universityId,
-          name: params.name || '',
+          university_id: params.university_id,
+          full_name: params.full_name || '',
           description: params.description || '',
-          imageUrl: params.imageUrl || '',
-          basicInfo: {
-            biography: params.basicInfo?.biography || '',
-            photo: params.basicInfo?.photo || '',
-            birthLocation: params.basicInfo?.birthLocation || '',
-            deathLocation: params.basicInfo?.deathLocation || '',
-            dateOfBirth: null,
-            dateOfDeath: null
+          image_url: params.image_url || '',
+          basic_info: {
+            biography: params.basic_info?.biography || '',
+            photo: params.basic_info?.photo || '',
+            birth_location: params.basic_info?.birth_location || '',
+            death_location: params.basic_info?.death_location || '',
+            date_of_birth: null,
+            date_of_death: null
           },
-          lifeStory: {
-            content: params.lifeStory?.content || '',
-            updatedAt: Timestamp.now()
+          life_story: {
+            content: params.life_story?.content || '',
+            updated_at: new Date().toISOString()
           }
         } as MemorialProfile;
       } else {
         profileData = {
           ...baseProfileData,
           type: 'personal',
-          name: params.name || '',
+          name: params.full_name || '',
           bio: '',
           photoURL: '',
           location: '',
@@ -136,7 +121,7 @@ export function useCreateProfile() {
             tags: [],
             categories: [],
             lastModifiedBy: '',
-            lastModifiedAt: Timestamp.now(),
+            lastModifiedAt: new Date().toISOString(),
             version: 1
           }
         } as PersonalProfile;
@@ -145,31 +130,22 @@ export function useCreateProfile() {
       console.log('useCreateProfile: Saving profile data', profileData);
       
       // Use a batch write to ensure atomic updates
-      const batch = writeBatch(db);
-      
-      // Create the main profile document
-      batch.set(profileRef, profileData);
-      
-      // Initialize the timeline subcollection with an empty document
-      const timelineRef = collection(db, collectionPath, profileId, 'timeline');
-      const initialTimelineDoc = doc(timelineRef);
-      batch.set(initialTimelineDoc, {
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-        type: 'initialization',
-        title: 'Profile Created',
-        description: 'Profile timeline initialized',
-        startDate: Timestamp.now().toDate().toISOString(),
-      });
-      
-      // Commit the batch
-      await batch.commit();
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert([profileData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('useCreateProfile: Error creating profile', error);
+        throw error;
+      }
 
       // Track the event
       trackEvent('profile_created', {
         profileId,
         profileType: params.type,
-        universityId: params.universityId
+        universityId: params.university_id
       });
 
       return profileId;

@@ -1,15 +1,32 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Icon } from '@/components/ui/Icon';
+import { Button } from '@/components/ui/Button';
 
 export function Header() {
-  const { user, signOut, isAdmin } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const isActive = (path: string) => {
     if (path === '/' && pathname === '/') return true;
@@ -70,10 +87,10 @@ export function Header() {
                   Dashboard
                 </Link>
                 
-                <div className="relative">
-                  <Link
-                    href="/profile" 
-                    className="flex items-center space-x-2 text-gray-700 hover:text-gray-900"
+                <div className="relative" ref={userMenuRef}>
+                  <button
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 focus:outline-none"
                   >
                     <div className="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center">
                       <span className="text-sm font-medium text-white">
@@ -81,7 +98,46 @@ export function Header() {
                       </span>
                     </div>
                     <span className="text-sm font-medium">{user?.displayName || user?.email}</span>
-                  </Link>
+                    <Icon name="chevron-down" className="h-4 w-4" />
+                  </button>
+                  
+                  {userMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
+                      <div className="px-4 py-2 border-b border-gray-100">
+                        <div className="text-sm font-medium text-gray-900">{user?.displayName || 'User'}</div>
+                        <div className="text-sm text-gray-500">{user?.email}</div>
+                      </div>
+                      <Link
+                        href="/profile"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        Your Profile
+                      </Link>
+                      <Link
+                        href="/dashboard"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        Dashboard
+                      </Link>
+                      {isAdmin && (
+                        <Link
+                          href="/admin"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          Admin Panel
+                        </Link>
+                      )}
+                      <button
+                        onClick={() => {
+                          logout();
+                          setUserMenuOpen(false);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        Sign out
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -183,7 +239,7 @@ export function Header() {
                 </Link>
               )}
               <button
-                onClick={() => signOut()}
+                onClick={() => logout()}
                 className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
               >
                 Sign out

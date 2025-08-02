@@ -2,13 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Icon } from '@/components/ui/Icon';
 import { toast } from 'react-hot-toast';
 import { PersonalProfile, MemorialProfile } from '@/types/profile';
-import { getFirebaseServices } from '@/lib/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { Timestamp } from 'firebase/firestore';
+import { supabase } from '@/lib/supabase';
 
 export default function EditProfilePage() {
   const { id } = useParams();
@@ -26,19 +24,23 @@ export default function EditProfilePage() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const { db } = await getFirebaseServices();
-        const profileRef = doc(db, 'profiles', id as string);
-        const profileDoc = await getDoc(profileRef);
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', id)
+          .single();
 
-        if (profileDoc.exists()) {
-          // Assume Firestore returns the correct type
-          const profileData = profileDoc.data() as PersonalProfile | MemorialProfile;
-          setProfile(profileData);
+        if (error) {
+          throw error;
+        }
+
+        if (profileData) {
+          setProfile(profileData as PersonalProfile | MemorialProfile);
           setFormData({
-            name: profileData.name || '',
-            email: profileData.type === 'personal' ? profileData.contact?.email || '' : '',
-            bio: profileData.type === 'personal' ? profileData.bio || '' : profileData.type === 'memorial' ? profileData.description || '' : '',
-            location: profileData.type === 'personal' ? profileData.location || '' : profileData.type === 'memorial' ? profileData.basicInfo?.birthLocation || '' : ''
+            name: profileData.full_name || '',
+            email: profileData.contact?.email || '',
+            bio: profileData.bio || '',
+            location: profileData.location || ''
           });
         } else {
           toast.error('Profile not found');
@@ -60,33 +62,26 @@ export default function EditProfilePage() {
     if (!profile) return;
 
     try {
-      const { db } = await getFirebaseServices();
-      const profileRef = doc(db, 'profiles', id as string);
-      
-      const updateData: Partial<PersonalProfile | MemorialProfile> = {
-        name: formData.name,
-        updatedBy: user?.uid,
-        updatedAt: Timestamp.fromDate(new Date()),
-      };
-
-      if (profile.type === 'personal') {
-        (updateData as Partial<PersonalProfile>).contact = {
+      const updateData = {
+        full_name: formData.name,
+        bio: formData.bio,
+        location: formData.location,
+        contact: {
           ...profile.contact,
           email: formData.email
-        };
-        (updateData as Partial<PersonalProfile>).bio = formData.bio;
-        (updateData as Partial<PersonalProfile>).location = formData.location;
-      } else if (profile.type === 'memorial') {
-        (updateData as Partial<MemorialProfile>).description = formData.bio;
-        if (profile.basicInfo) {
-          (updateData as Partial<MemorialProfile>).basicInfo = {
-            ...profile.basicInfo,
-            birthLocation: formData.location
-          };
-        }
+        },
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) {
+        throw error;
       }
 
-      await updateDoc(profileRef, updateData);
       toast.success('Profile updated successfully');
       router.push(`/profile/${id}`);
     } catch (error) {

@@ -4,8 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { getFirebaseServices } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, DocumentData } from 'firebase/firestore';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import dynamic from 'next/dynamic';
 import { Icon } from '@/components/ui/Icon';
@@ -15,11 +14,6 @@ interface University {
   name: string;
   logo?: string;
   role?: string;
-}
-
-interface PermissionData {
-  role: string;
-  [key: string]: any;
 }
 
 // Create a client-side only component for the dashboard content
@@ -33,18 +27,10 @@ const DashboardContent = () => {
   const handleNavigation = (path: string) => {
     if (path.startsWith('/university/')) {
       const universityId = path.split('/').pop();
-      console.log('Finding university for ID:', universityId);
       const university = adminUniversities.find(u => u.id === universityId);
       if (university) {
         const urlName = university.name.toLowerCase().replace(/\s+/g, '-');
-        console.log('Navigating to university:', {
-          originalName: university.name,
-          urlName,
-          id: university.id
-        });
         router.push(`/university/${urlName}`);
-      } else {
-        console.error('University not found for ID:', universityId);
       }
     } else {
       router.push(path);
@@ -52,82 +38,57 @@ const DashboardContent = () => {
   };
 
   useEffect(() => {
-    console.log('Dashboard mounted, user:', user?.uid);
-    if (user) {
+    if (user && user.id) {
       fetchData();
-    } else {
-      console.log('No user found');
+    } else if (user === null) {
+      // User is explicitly null (not authenticated)
       setLoading(false);
     }
-  }, [user]);
+    // If user is undefined, keep loading (waiting for auth to load)
+  }, [user?.id]); // Only depend on user.id, not the entire user object
 
   const fetchData = async () => {
     try {
-      console.log('Fetching data for user:', user?.uid);
-      const { db } = await getFirebaseServices();
-      if (!db || !user) {
-        console.error('Database not initialized or user not authenticated');
-        setError('Database not initialized or user not authenticated');
+      if (!user) {
+        setError('User not authenticated');
         return;
       }
 
       // Get all universities
-      const universitiesRef = collection(db, 'universities');
-      const universitiesSnapshot = await getDocs(universitiesRef);
-      console.log('Found', universitiesSnapshot.docs.length, 'universities');
-
-      const adminUnis: University[] = [];
-
-      // Check each university for admin status
-      for (const universityDoc of universitiesSnapshot.docs) {
-        const data = universityDoc.data();
-        console.log('Checking university:', universityDoc.id);
-        console.log('University data:', JSON.stringify(data, null, 2));
-
-        // Check both admins and adminIds arrays
-        const admins = data.admins || [];
-        const adminIds = data.adminIds || [];
-        console.log('Admins array:', admins);
-        console.log('AdminIds array:', adminIds);
-        console.log('Is user in admins array?', admins.includes(user.uid));
-        console.log('Is user in adminIds array?', adminIds.includes(user.uid));
-        
-        if (admins.includes(user.uid) || adminIds.includes(user.uid)) {
-          console.log('Found admin in arrays for:', universityDoc.id);
-          adminUnis.push({
-            id: universityDoc.id,
-            name: data.name,
-            logo: data.logo,
-            role: 'Admin'
-          });
-          continue;
-        }
-
-        // Check permissions subcollection
-        const permissionRef = doc(db, 'universities', universityDoc.id, 'permissions', user.uid);
-        const permissionDoc = await getDoc(permissionRef);
-        console.log('Permission doc exists?', permissionDoc.exists());
-        
-        if (permissionDoc.exists()) {
-          const permissionData = permissionDoc.data() as PermissionData;
-          console.log('Permission data:', JSON.stringify(permissionData, null, 2));
-          if (permissionData.role === 'admin') {
-            console.log('Found admin in permissions for:', universityDoc.id);
-            adminUnis.push({
-              id: universityDoc.id,
-              name: data.name,
-              logo: data.logo,
-              role: 'Admin'
-            });
-          }
-        }
+      const { data: universities, error: universitiesError } = await supabase
+        .from('universities')
+        .select('*');
+      
+      if (universitiesError) {
+        setError('Error fetching universities');
+        return;
       }
+      
+      // Check which universities the user is admin of
+      const { data: adminRelationships, error: adminError } = await supabase
+        .from('university_admins')
+        .select('university_id')
+        .eq('user_id', user.id);
+      
+      if (adminError) {
+        setError('Error checking admin status');
+        return;
+      }
+      
+      // Filter universities where user is admin
+      const adminUniversityIds = adminRelationships?.map(rel => rel.university_id) || [];
+      const adminUnis: University[] = (universities || [])
+        .filter(uni => adminUniversityIds.includes(uni.id))
+        .map(uni => ({
+          id: uni.id,
+          name: uni.name,
+          logo: uni.logo_url,
+          role: 'Admin'
+        }));
 
-      console.log('Found', adminUnis.length, 'universities where user is admin');
       setAdminUniversities(adminUnis);
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching data:', error);
       setError(error instanceof Error ? error.message : 'An error occurred');
       setLoading(false);
     }

@@ -2,10 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getFirebaseServices } from '@/lib/firebase';
-import { collection, query, where, getDocs, DocumentData } from 'firebase/firestore';
+import { supabase } from '@/lib/supabase';
 import { Icon } from '@/components/ui/Icon';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import type { UniversityProfile } from '@/types/university';
 
 export function FeaturedUniversities() {
@@ -17,22 +16,17 @@ export function FeaturedUniversities() {
   useEffect(() => {
     const loadUniversities = async () => {
       try {
-        const services = await getFirebaseServices();
-        if (!services.db) {
-          console.warn('Firestore not initialized yet');
+        const { data: universitiesList, error } = await supabase
+          .from('universities')
+          .select('*')
+          .eq('is_featured', true);
+
+        if (error) {
+          console.error('Error loading featured universities:', error);
           return;
         }
 
-        const universitiesRef = collection(services.db, 'universities');
-        const q = query(universitiesRef, where('isFeatured', '==', true));
-        const snapshot = await getDocs(q);
-        
-        const universitiesList = snapshot.docs.map((doc: DocumentData) => ({
-          id: doc.id,
-          ...doc.data()
-        })) as UniversityProfile[];
-        
-        setUniversities(universitiesList);
+        setUniversities(universitiesList || []);
       } catch (error) {
         console.error('Error loading featured universities:', error);
       } finally {
