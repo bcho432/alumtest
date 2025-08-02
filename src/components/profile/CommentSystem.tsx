@@ -101,7 +101,7 @@ export const CommentSystem: React.FC<CommentSystemProps> = ({
   };
 
   const renderComment = (comment: Comment) => {
-    const isAuthor = comment.authorId === user?.uid;
+    const isAuthor = comment.authorId === user?.id;
     const canEdit = isAuthor || isAdmin;
     const canDelete = isAuthor || isAdmin;
     const canResolve = isAdmin;
@@ -192,7 +192,7 @@ export const CommentSystem: React.FC<CommentSystemProps> = ({
                     key={emoji}
                     onClick={() => handleReaction(comment.id, emoji)}
                     className={`flex items-center space-x-1 px-2 py-1 rounded ${
-                      userIds.includes(user?.uid || '')
+                      userIds.includes(user?.id || '')
                         ? 'bg-blue-100 text-blue-600'
                         : 'bg-gray-100 text-gray-600'
                     }`}

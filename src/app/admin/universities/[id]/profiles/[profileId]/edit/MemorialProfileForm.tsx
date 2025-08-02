@@ -50,7 +50,7 @@ const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({ profile, onSu
         }
 
         // If lock is held by current user, we can proceed
-        if (currentLock.userId === auth.currentUser?.uid) {
+        if (currentLock.userId === auth.currentUser?.id) {
           return true;
         }
 
@@ -90,10 +90,10 @@ const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({ profile, onSu
           const currentTime = new Date().getTime();
           
           // If lock is expired or held by current user, we can proceed
-          if (currentTime - lockTime > LOCK_TIMEOUT || currentLock.userId === auth.currentUser?.uid) {
+          if (currentTime - lockTime > LOCK_TIMEOUT || currentLock.userId === auth.currentUser?.id) {
             transaction.update(profileRef, {
               lock: {
-                userId: auth.currentUser?.uid,
+                userId: auth.currentUser?.id,
                 timestamp: new Date()
               }
             });
@@ -106,7 +106,7 @@ const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({ profile, onSu
         // No lock exists, acquire it
         transaction.update(profileRef, {
           lock: {
-            userId: auth.currentUser?.uid,
+            userId: auth.currentUser?.id,
             timestamp: new Date()
           }
         });

@@ -94,7 +94,7 @@ export default function CreateContentPage() {
       
       const newContent = {
         ...formData,
-        authorId: user?.uid,
+        authorId: user?.id,
         createdAt: now,
         updatedAt: now,
         views: 0,

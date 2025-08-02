@@ -129,7 +129,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
 
   // Check and acquire lock
   const checkAndAcquireLock = async () => {
-    if (!profile?.id || !user?.uid) return;
+    if (!profile?.id || !user?.id) return;
 
     try {
       const { db } = await getFirebaseServices();
@@ -148,7 +148,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
         const lockTime = new Date(profileData.lock.timestamp);
         const isLockExpired = now.getTime() - lockTime.getTime() > LOCK_TIMEOUT;
 
-        if (!isLockExpired && profileData.lock.userId !== user.uid) {
+        if (!isLockExpired && profileData.lock.userId !== user.id) {
           setIsLocked(true);
           setLockError('This profile is currently being edited by another user. Please try again later.');
           return false;
@@ -158,7 +158,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
       // Create or update lock
       await updateDoc(profileRef, {
         lock: {
-          userId: user.uid,
+          userId: user.id,
           timestamp: now
         }
       });
@@ -175,7 +175,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
 
   // Release lock
   const releaseLock = async () => {
-    if (!profile?.id || !user?.uid) return;
+    if (!profile?.id || !user?.id) return;
 
     try {
       const { db } = await getFirebaseServices();
@@ -386,7 +386,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
         ...formData,
         status,
         updatedAt: Timestamp.now(),
-        updatedBy: user?.uid || 'system'
+        updatedBy: user?.id || 'system'
       };
 
       const submitDataRecord = submitData as Record<string, any>;

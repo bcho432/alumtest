@@ -68,7 +68,7 @@ export function UniversityPermissionsTable({ orgId }: { orgId: string }) {
           <PermissionRow
             key={id}
             user={{
-              uid: (user?.uid ?? user?.id ?? id ?? '') as string,
+              uid: (user?.id ?? user?.id ?? id ?? '') as string,
               displayName: user?.displayName ?? '',
               email: user?.email ?? '',
             }}

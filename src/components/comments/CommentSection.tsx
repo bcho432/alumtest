@@ -201,7 +201,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ mediaId, onComme
                     <span className="text-sm text-gray-500">(edited)</span>
                   )}
                 </div>
-                {user?.uid === comment.authorId && (
+                {user?.id === comment.authorId && (
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => setEditingComment(comment.id)}
@@ -258,7 +258,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ mediaId, onComme
                 <button
                   onClick={() => handleReaction(comment.id)}
                   className={`flex items-center space-x-1 ${
-                    comment.likes?.includes(user?.uid || '') ? 'text-red-500' : 'text-gray-500'
+                    comment.likes?.includes(user?.id || '') ? 'text-red-500' : 'text-gray-500'
                   }`}
                 >
                   <FiHeart size={16} />

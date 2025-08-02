@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         return onAuthStateChanged(auth, async (user) => {
           console.log('[Auth Context] Auth state changed:', {
-            userId: user?.uid,
+            userId: user?.id,
             email: user?.email,
             isAnonymous: user?.isAnonymous,
             providerId: user?.providerId
@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (user) {
             try {
               const db = await getDb();
-              const userDoc = await getDoc(doc(db, 'users', user.uid));
+              const userDoc = await getDoc(doc(db, 'users', user.id));
               
               // Wait for admin settings to load
               if (storiatsAdminsLoading) {
@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 });
               } else {
                 // Handle case where user document doesn't exist
-                console.warn('[Auth Context] User document not found for:', user.uid);
+                console.warn('[Auth Context] User document not found for:', user.id);
                 setIsAdmin(false);
                 setUserRoles({
                   isAdmin: false,
@@ -183,7 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Check admin status
       const db = await getDb();
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.id));
       
       if (userDoc.exists()) {
         const userData = userDoc.data();
@@ -226,7 +226,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Create user document
       const db = await getDb();
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
+      await setDoc(doc(db, 'users', userCredential.user.id), {
         email: data.email,
         isAdmin: false,
         profileRoles: {},

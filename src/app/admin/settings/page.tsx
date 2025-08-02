@@ -41,7 +41,7 @@ export default function StoriatsAdminSettingsPage() {
   useEffect(() => {
     if (user?.email) {
       console.log('[Auth State] Changed:', {
-        userId: user?.uid,
+        userId: user?.id,
         email: user?.email,
         isAdmin: isStoriatsAdmin(user.email.toLowerCase())
       });
