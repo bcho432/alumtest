@@ -85,11 +85,11 @@ export const EnhancedProfileCard: React.FC<EnhancedProfileCardProps> = ({
             <div className="flex flex-col md:flex-row items-center gap-8">
               {/* Profile Photo */}
               <div className="w-40 h-40 flex-shrink-0 bg-white rounded-2xl p-4 shadow-xl">
-                {profile.type === 'personal' && (profile as any).photoURL ? (
+                {profile.type === 'personal' && false ? (
                   <img
-                    src={(profile as any).photoURL}
+                    src=""
                     alt={profile.name}
-                    className="w-full h-full object-cover rounded-xl"
+                    className="w-full h-full rounded-full object-cover"
                   />
                 ) : profile.type === 'memorial' && (profile as any).basicInfo?.photo ? (
                   <img
@@ -296,9 +296,9 @@ export const EnhancedProfileCard: React.FC<EnhancedProfileCardProps> = ({
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-4">
-            {profile.type === 'personal' && (profile as any).photoURL ? (
+            {profile.type === 'personal' && false ? (
               <img
-                src={(profile as any).photoURL}
+                src=""
                 alt={profile.name}
                 className="w-16 h-16 rounded-full object-cover"
               />

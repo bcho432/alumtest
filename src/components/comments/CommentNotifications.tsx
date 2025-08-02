@@ -26,7 +26,7 @@ export const CommentNotifications: React.FC<CommentNotificationsProps> = ({ onNo
   const loadNotifications = async () => {
     try {
       setLoading(true);
-      const unreadNotifications = await CommentService.getUnreadNotifications(user!.uid);
+      const unreadNotifications = await CommentService.getUnreadNotifications(user!.id);
       setNotifications(unreadNotifications);
     } catch (error) {
       toast.error('Failed to load notifications');

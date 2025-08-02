@@ -1,5 +1,5 @@
 {
-  "name": "memory-vista",
+  "name": "storiats",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "check": "npm run lint && npm run type-check",
+    "type-check": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
     "init-admin": "node scripts/init-admin-settings.js"

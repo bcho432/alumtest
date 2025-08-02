@@ -27,7 +27,7 @@ export function PinButton({ profileId, className = '' }: PinButtonProps) {
           return;
         }
 
-        const pinRef = doc(db, 'users', user.uid, 'pinnedProfiles', profileId);
+        const pinRef = doc(db, 'users', user.id, 'pinnedProfiles', profileId);
         const pinDoc = await getDoc(pinRef);
         setIsPinned(pinDoc.exists());
       } catch (error) {
@@ -50,7 +50,7 @@ export function PinButton({ profileId, className = '' }: PinButtonProps) {
         return;
       }
 
-      const pinRef = doc(db, 'users', user.uid, 'pinnedProfiles', profileId);
+      const pinRef = doc(db, 'users', user.id, 'pinnedProfiles', profileId);
       
       if (isPinned) {
         await deleteDoc(pinRef);

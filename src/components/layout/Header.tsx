@@ -54,7 +54,7 @@ export function Header() {
             <Link href="/" className="flex-shrink-0 group">
               <div className="flex items-center">
                 <Icon name="candle" className="h-8 w-8 text-indigo-600 transition-transform duration-300 group-hover:scale-110" />
-                <span className="ml-2 text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">Memory Vista</span>
+                <span className="ml-2 text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">Storiats</span>
               </div>
             </Link>
             <nav className="ml-10 hidden space-x-8 md:flex">
@@ -192,23 +192,23 @@ export function Header() {
           <div className="border-t border-gray-200 pb-3 pt-4">
             <div className="flex items-center px-4">
               <div className="flex-shrink-0">
-                {user.photoURL ? (
+                {false ? (
                   <img 
                     className="h-10 w-10 rounded-full"
-                    src={user.photoURL}
-                    alt={user.displayName || 'User'}
+                    src=""
+                    alt={user?.displayName || 'User'}
                   />
                 ) : (
                   <div className="h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-medium">
-                    {user.displayName?.charAt(0) || user.email?.charAt(0) || 'U'}
+                    {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
                   </div>
                 )}
               </div>
               <div className="ml-3">
                 <div className="text-base font-medium text-gray-800">
-                  {user.displayName || 'User'}
+                  {user?.displayName || 'User'}
                 </div>
-                <div className="text-sm font-medium text-gray-500">{user.email}</div>
+                <div className="text-sm font-medium text-gray-500">{user?.email}</div>
               </div>
             </div>
             <div className="mt-3 space-y-1">

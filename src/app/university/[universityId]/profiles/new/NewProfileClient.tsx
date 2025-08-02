@@ -51,7 +51,7 @@ export default function NewProfileClient({ params }: NewProfileClientProps) {
       
       const profileData = {
         ...formData,
-        createdBy: user.uid,
+        createdBy: user.id,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
       };

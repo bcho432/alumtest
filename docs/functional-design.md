@@ -3,7 +3,7 @@
 ## 1. System Overview
 
 ### 1.1 Purpose
-The Memory Vista platform is designed to provide a modern, scalable solution for creating and managing digital memorials. The system enables organizations to maintain profiles of their members, with rich media content, stories, and interactive features.
+The Storiats platform is designed to provide a modern, scalable solution for creating and managing digital memorials. The system enables organizations to maintain profiles of their members, with rich media content, stories, and interactive features.
 
 ### 1.2 Core Functionality
 - Profile Management

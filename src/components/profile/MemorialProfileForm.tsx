@@ -142,7 +142,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
         const lockTime = new Date(profileData.lock.timestamp);
         const isLockExpired = now.getTime() - lockTime.getTime() > LOCK_TIMEOUT;
 
-        if (!isLockExpired && profileData.lock.user_id !== user.id) {
+        if (!isLockExpired && profileData.lock.userId !== user.id) {
           setIsLocked(true);
           setLockError('This profile is currently being edited by another user. Please try again later.');
           return false;
@@ -154,7 +154,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
         .from('profiles')
         .update({
           lock: {
-            user_id: user.id,
+            userId: user.id,
             timestamp: now.toISOString()
           }
         })
@@ -450,7 +450,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
       return;
     }
     
-    setFormData(prev => ({
+    setFormData((prev: any) => ({
       ...prev,
       metadata: {
         tags: [...(prev.metadata?.tags || []), newTag.trim()],
@@ -464,10 +464,10 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
-    setFormData(prev => ({
+    setFormData((prev: any) => ({
       ...prev,
       metadata: {
-        tags: (prev.metadata?.tags || []).filter(tag => tag !== tagToRemove),
+        tags: (prev.metadata?.tags || []).filter((tag: any) => tag !== tagToRemove),
         categories: prev.metadata?.categories || [],
         lastModifiedBy: prev.metadata?.lastModifiedBy || '',
         lastModifiedAt: Timestamp.fromDate(new Date()),
@@ -477,7 +477,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
   };
 
   const handleImageUpload = (url: string) => {
-    setFormData(prev => ({
+    setFormData((prev: any) => ({
       ...prev,
       imageUrl: url
     }));
@@ -809,7 +809,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
                   eventId={formData.id || 'new'}
                   existingMedia={formData.mediaUrls || []}
                   onMediaChange={(urls) => {
-                    setFormData((prev) => ({ ...prev, mediaUrls: urls }));
+                    setFormData((prev: any) => ({ ...prev, mediaUrls: urls }));
                   }}
                 />
               </div>
@@ -821,7 +821,7 @@ export const MemorialProfileForm: React.FC<MemorialProfileFormProps> = ({
               <h3 className="text-lg font-medium text-gray-900 mb-4">Tags</h3>
               <div className="mt-4">
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {formData.metadata?.tags?.map((tag) => (
+                  {formData.metadata?.tags?.map((tag: any) => (
                     <Badge key={tag} variant="secondary">
                       {tag}
                       <button

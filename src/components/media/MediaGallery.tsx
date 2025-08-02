@@ -59,10 +59,10 @@ export function MediaGallery({ profileId, className, files, onFileClick }: Media
       setFolders([{
         id: 'temp',
         name: 'Temporary Uploads',
-        created_by: user.id,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        item_count: 0
+        createdBy: user.id,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        itemCount: 0
       }]);
       setCurrentFolder('temp');
       setIsLoading(false);
@@ -267,7 +267,7 @@ export function MediaGallery({ profileId, className, files, onFileClick }: Media
       setIsUploading(true);
       try {
         const uploadPromises = acceptedFiles.map(file => 
-          MediaService.uploadMedia(file, currentFolder, user.uid, (progress) => {
+          MediaService.uploadMedia(file, currentFolder, user.id, (progress) => {
             setUploadProgress(prev => {
               const newProgress = [...prev];
               const index = newProgress.findIndex(p => p.file === file);
@@ -288,7 +288,7 @@ export function MediaGallery({ profileId, className, files, onFileClick }: Media
           const newPhotos = uploadedFiles.map(url => ({
             id: Math.random().toString(36).substr(2, 9),
             url,
-            uploadedBy: user.uid,
+            uploadedBy: user.id,
             uploadedAt: new Date().toISOString(),
             tags: [],
             folderId: currentFolder

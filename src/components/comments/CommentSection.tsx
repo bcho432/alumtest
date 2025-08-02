@@ -105,13 +105,13 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ mediaId, onComme
         content: newComment.trim(),
         parentId: replyingTo || undefined,
         createdBy: {
-          id: user.uid,
+          id: user.id,
           name: user.displayName || 'Anonymous',
           email: user.email || '',
-          avatarUrl: user.photoURL || undefined
+          avatarUrl: undefined
         },
-        profileId: user.uid,
-        orgId: user.uid
+        profileId: user.id,
+        orgId: user.id
       });
 
       setNewComment('');
@@ -161,7 +161,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ mediaId, onComme
     if (!user) return;
 
     try {
-      await CommentService.addReaction(commentId, user.uid, 'like');
+      await CommentService.addReaction(commentId, user.id, 'like');
       loadComments();
       if (showThread === commentId) {
         loadThread(commentId);

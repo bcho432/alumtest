@@ -19,7 +19,7 @@ export function useUserRoles() {
 
       try {
         const db = await getDb();
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        const userDoc = await getDoc(doc(db, 'users', user.id));
         if (userDoc.exists()) {
           const userData = userDoc.data();
           setRoles(userData.orgRoles || {});

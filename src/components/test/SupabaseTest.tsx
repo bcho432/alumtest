@@ -68,8 +68,8 @@ export function SupabaseTest() {
       addResult('Testing sign up...');
       const result = await signUp({
         email: `test-${Date.now()}@example.com`,
-        password: 'testpassword123',
-        name: 'Test User'
+        password: 'password123',
+        confirmPassword: 'password123'
       });
       
       if (result.success) {
@@ -87,7 +87,7 @@ export function SupabaseTest() {
       addResult('Testing sign in...');
       const result = await signIn({
         email: 'test@example.com',
-        password: 'testpassword123'
+        password: 'password123'
       });
       
       if (result.success) {
@@ -116,7 +116,7 @@ export function SupabaseTest() {
             Test Sign In
           </Button>
           {user && (
-            <Button onClick={signOut} variant="destructive">
+            <Button onClick={signOut} variant="outline">
               Sign Out
             </Button>
           )}

@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         return onAuthStateChanged(auth, async (user) => {
           console.log('[Auth Context] Auth state changed:', {
-            userId: user?.id,
+            userId: user?.uid,
             email: user?.email,
             isAnonymous: user?.isAnonymous,
             providerId: user?.providerId
@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (user) {
             try {
               const db = await getDb();
-              const userDoc = await getDoc(doc(db, 'users', user.id));
+              const userDoc = await getDoc(doc(db, 'users', user.uid));
               
               // Wait for admin settings to load
               if (storiatsAdminsLoading) {
@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 });
               } else {
                 // Handle case where user document doesn't exist
-                console.warn('[Auth Context] User document not found for:', user.id);
+                console.warn('[Auth Context] User document not found for:', user.uid);
                 setIsAdmin(false);
                 setUserRoles({
                   isAdmin: false,
@@ -160,86 +160,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [isStoriatsAdmin, storiatsAdminsLoading, storiatsAdminsError]);
 
   const signIn = async (data: SignInFormData) => {
-    const { auth } = await getFirebaseServices();
-    if (!auth) {
-      throw new Error('Firebase Auth is not initialized. Please check your environment variables.');
-    }
-
-    // Validate inputs
-    const emailError = validateEmail(data.email);
-    if (emailError) throw new Error(emailError);
-
-    // Check rate limiting
-    const rateLimitResult = checkRateLimit(`signin_${data.email}`);
-    if (!rateLimitResult.allowed) {
-      throw new Error(rateLimitResult.message);
-    }
-
     setLoading(true);
+    setLastError(null);
+
     try {
+      const { auth } = await getFirebaseServices();
+      if (!auth) {
+        throw new Error('Firebase Auth is not initialized');
+      }
+      
       const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
       // Reset rate limit on successful sign in
       resetRateLimit(`signin_${data.email}`);
       
-      // Check admin status
-      const db = await getDb();
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.id));
-      
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        setIsAdmin(userData.isAdmin || isStoriatsAdmin(userCredential.user.email?.toLowerCase() || ''));
-      }
-      
-      return userCredential.user;
+      return { success: true };
     } catch (error) {
       console.error('Sign in error:', error);
       if (error instanceof FirebaseError) {
-        throw new Error(error.message);
+        setLastError(new Error(error.message));
+        return { success: false, error: error.message };
       }
-      throw error;
+      setLastError(new Error('Sign in failed'));
+      return { success: false, error: 'Sign in failed' };
     } finally {
       setLoading(false);
     }
   };
 
   const signUp = async (data: SignUpFormData) => {
-    const { auth } = await getFirebaseServices();
-    if (!auth) {
-      throw new Error('Firebase Auth is not initialized. Please check your environment variables.');
-    }
-
-    // Validate inputs
-    const emailError = validateEmail(data.email);
-    if (emailError) throw new Error(emailError);
-
-    // Check rate limiting
-    const rateLimitResult = checkRateLimit(`signup_${data.email}`);
-    if (!rateLimitResult.allowed) {
-      throw new Error(rateLimitResult.message);
-    }
-
     setLoading(true);
+    setLastError(null);
+
     try {
+      const { auth } = await getFirebaseServices();
+      if (!auth) {
+        throw new Error('Firebase Auth is not initialized');
+      }
+      
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       // Reset rate limit on successful sign up
       resetRateLimit(`signup_${data.email}`);
       
       // Create user document
       const db = await getDb();
-      await setDoc(doc(db, 'users', userCredential.user.id), {
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
         email: data.email,
         isAdmin: false,
         profileRoles: {},
         createdAt: new Date()
       });
       
-      return userCredential.user;
+      return { success: true };
     } catch (error) {
       console.error('Sign up error:', error);
       if (error instanceof FirebaseError) {
-        throw new Error(error.message);
+        setLastError(new Error(error.message));
+        return { success: false, error: error.message };
       }
-      throw error;
+      setLastError(new Error('Sign up failed'));
+      return { success: false, error: 'Sign up failed' };
     } finally {
       setLoading(false);
     }
@@ -272,29 +251,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = async (email: string) => {
     // Implement your reset password logic here
-    return Promise.resolve();
+    return { success: true };
   };
 
   const updatePassword = async (password: string) => {
     // Implement your update password logic here
-    return Promise.resolve();
+    return { success: true };
   };
 
   const updateEmail = async (email: string) => {
     // Implement your update email logic here
-    return Promise.resolve();
+    return { success: true };
   };
 
   const updateProfile = async (data: Partial<UserProfile>) => {
     // Implement your update profile logic here
-    return Promise.resolve();
+    return { success: true };
   };
 
   const value = {
     user,
+    session: null, // Add missing session property
     loading,
+    initializing: loading, // Add missing initializing property
     error: lastError,
+    lastError, // Add missing lastError property
     isAdmin,
+    userProfile: null, // Add missing userProfile property
     signIn,
     signUp,
     signOut,

@@ -13,7 +13,7 @@ export const UserHomePage = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8">Welcome to Memory Vista</h1>
+              <h1 className="text-3xl font-bold mb-8">Welcome to Storiats</h1>
       
       {isAdmin ? (
         <div className="bg-blue-50 p-6 rounded-lg">

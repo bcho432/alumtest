@@ -57,7 +57,8 @@ export const useAuth = () => {
     const result = await supabaseAuth.signUp({
       email,
       password,
-      name: email.split('@')[0] // Default name from email
+      confirmPassword: password, // Add missing confirmPassword
+      // name: email.split('@')[0] // Default name from email - removed as it's not in SignUpFormData type
     });
     
     if (!result.success) {

@@ -93,7 +93,7 @@ export default function Footer() {
           ))}
         </div>
         <p className="mt-10 text-center text-xs leading-5 text-gray-400">
-          &copy; {currentYear} Memory Vista. All rights reserved.
+          &copy; {currentYear} Storiats. All rights reserved.
         </p>
       </div>
     </footer>

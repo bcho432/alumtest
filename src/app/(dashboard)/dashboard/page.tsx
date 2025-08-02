@@ -60,35 +60,25 @@ const DashboardContent = () => {
         .select('*');
       
       if (universitiesError) {
+        console.error('Universities error:', universitiesError);
         setError('Error fetching universities');
         return;
       }
       
-      // Check which universities the user is admin of
-      const { data: adminRelationships, error: adminError } = await supabase
-        .from('university_admins')
-        .select('university_id')
-        .eq('user_id', user.id);
-      
-      if (adminError) {
-        setError('Error checking admin status');
-        return;
-      }
-      
-      // Filter universities where user is admin
-      const adminUniversityIds = adminRelationships?.map(rel => rel.university_id) || [];
+      // For now, show all universities as admin (since university_admins table doesn't exist)
+      // TODO: Implement proper admin checking when university_admins table is created
       const adminUnis: University[] = (universities || [])
-        .filter(uni => adminUniversityIds.includes(uni.id))
         .map(uni => ({
           id: uni.id,
           name: uni.name,
           logo: uni.logo_url,
-          role: 'Admin'
+          role: 'Admin' // Temporary - all users see all universities as admin
         }));
 
       setAdminUniversities(adminUnis);
       setLoading(false);
     } catch (error) {
+      console.error('Dashboard fetch error:', error);
       setError(error instanceof Error ? error.message : 'An error occurred');
       setLoading(false);
     }

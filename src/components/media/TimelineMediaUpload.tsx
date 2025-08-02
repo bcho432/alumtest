@@ -37,7 +37,7 @@ export const TimelineMediaUpload: React.FC<TimelineMediaUploadProps> = ({
       const results = await MediaService.bulkUploadMedia(
         files,
         eventId,
-        user.uid,
+        user.id,
         [],
         (uploadProgress) => {
           setUploadProgress(uploadProgress.map(up => ({

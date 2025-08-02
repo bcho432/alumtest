@@ -86,7 +86,7 @@ export default function SignUpForm() {
             Create your account
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Join Memory Vista to start preserving and sharing memories
+            Join Storiats to start preserving and sharing memories
           </p>
         </div>
 

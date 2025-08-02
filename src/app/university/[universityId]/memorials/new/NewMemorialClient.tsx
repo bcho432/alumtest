@@ -51,7 +51,7 @@ export default function NewMemorialClient({ params }: NewMemorialClientProps) {
       
       const memorialData = {
         ...formData,
-        createdBy: user.uid,
+        createdBy: user.id,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
       };

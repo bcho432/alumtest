@@ -122,7 +122,7 @@ export default function Home() {
           <TestimonialCard
             name="Sarah M."
             role="Granddaughter"
-            text="Memory Vista made it easy to honor my grandfather's life and share his story with our family."
+            text="Storiats made it easy to honor my grandfather's life and share his story with our family."
           />
           <TestimonialCard
             name="Michael R."
@@ -140,7 +140,7 @@ export default function Home() {
       {/* CTA Section */}
       <section className="bg-gradient-to-r from-indigo-500 to-purple-500 py-16 text-center text-white z-10 rounded-3xl max-w-7xl mx-auto my-12">
         <h2 className="text-4xl font-bold mb-4">Start preserving memories today</h2>
-        <p className="text-lg mb-8">Join thousands of families using Memory Vista to honor and celebrate life stories.</p>
+        <p className="text-lg mb-8">Join thousands of families using Storiats to honor and celebrate life stories.</p>
         <div className="mt-10 flex items-center justify-center gap-x-6">
           <Link
             href="/auth/signup"

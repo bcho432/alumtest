@@ -41,7 +41,7 @@ export function EditorRequestButton({ profileId, className }: EditorRequestButto
     const dbInstance = db as import('firebase/firestore').Firestore;
     const loadRequestStats = async () => {
       try {
-        const statsRef = doc(dbInstance, 'users', user.uid, 'editorRequestStats', 'stats');
+        const statsRef = doc(dbInstance, 'users', user.id, 'editorRequestStats', 'stats');
         const statsDoc = await getDoc(statsRef);
         
         if (statsDoc.exists()) {
@@ -49,7 +49,7 @@ export function EditorRequestButton({ profileId, className }: EditorRequestButto
         } else {
           // Initialize stats if they don't exist
           const initialStats: EditorRequestStats = {
-            userId: user.uid,
+            userId: user.id,
             totalRequests: 0,
             pendingRequests: 0,
             lastRequestAt: Timestamp.now()
@@ -96,7 +96,7 @@ export function EditorRequestButton({ profileId, className }: EditorRequestButto
       const requestRef = doc(collection(dbInstance, 'profiles', profileId, 'editorRequests'));
       const request: EditorRequest = {
         id: requestRef.id,
-        userId: user.uid,
+        userId: user.id,
         userEmail: user.email || '',
         profileId,
         status: 'pending',
@@ -108,7 +108,7 @@ export function EditorRequestButton({ profileId, className }: EditorRequestButto
       await setDoc(requestRef, request);
 
       // Update request stats
-      const statsRef = doc(dbInstance, 'users', user.uid, 'editorRequestStats', 'stats');
+      const statsRef = doc(dbInstance, 'users', user.id, 'editorRequestStats', 'stats');
       const newStats: EditorRequestStats = {
         ...requestStats!,
         totalRequests: requestStats!.totalRequests + 1,

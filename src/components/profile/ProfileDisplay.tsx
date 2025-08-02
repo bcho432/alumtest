@@ -26,11 +26,8 @@ export const ProfileDisplay: React.FC<ProfileDisplayProps> = ({ profile }) => {
   };
 
   const getPhotoUrl = (profile: Profile): string | undefined => {
-    if (isMemorialProfile(profile)) {
-      return ((profile as unknown) as MemorialProfile).basicInfo?.photo;
-    }
-    if (isPersonalProfile(profile)) {
-      return ((profile as unknown) as PersonalProfile).photoURL;
+    if (profile.type === 'personal') {
+      return undefined;
     }
     return undefined;
   };

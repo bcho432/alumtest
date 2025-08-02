@@ -41,6 +41,11 @@ export default function EditMemorialPage() {
             universityId={universityId}
             memorialId={memorialId}
             onSuccess={() => router.push(`/university/${universityId}/memorials/${memorialId}`)}
+            onSubmit={async (data) => {
+              // TODO: Implement memorial update logic
+              console.log('Submitting memorial data:', data);
+            }}
+            onCancel={() => router.back()}
           />
         </Card>
       </div>

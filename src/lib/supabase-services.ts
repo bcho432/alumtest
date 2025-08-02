@@ -5,70 +5,70 @@ import type { University } from '@/types/university';
 // Types for Supabase responses
 export interface SupabaseProfile {
   id: string;
-  university_id: string | null;
-  user_id: string | null;
+  universityId: string | null;
+  userId: string | null;
   type: 'personal' | 'memorial' | 'university';
   status: 'draft' | 'published' | 'pending_review' | 'archived';
   visibility: 'public' | 'private' | 'restricted';
-  full_name: string;
+  fullName: string;
   bio: string | null;
-  photo_url: string | null;
-  cover_image_url: string | null;
+  photoUrl: string | null;
+  coverImageUrl: string | null;
   department: string | null;
-  graduation_year: number | null;
+  graduationYear: number | null;
   location: string | null;
   contact: any;
-  date_of_birth: string | null;
-  date_of_death: string | null;
-  birth_location: string | null;
-  death_location: string | null;
+  dateOfBirth: string | null;
+  dateOfDeath: string | null;
+  birthLocation: string | null;
+  deathLocation: string | null;
   tags: string[];
   metadata: any;
-  is_featured: boolean;
-  created_at: string;
-  updated_at: string;
-  published_at: string | null;
-  published_by: string | null;
+  isFeatured: boolean;
+  createdAt: string;
+  updatedAt: string;
+  publishedAt: string | null;
+  publishedBy: string | null;
 }
 
 export interface SupabaseUniversity {
   id: string;
   name: string;
   domain: string | null;
-  logo_url: string | null;
+  logoUrl: string | null;
   description: string | null;
   location: string | null;
   website: string | null;
-  contact_email: string | null;
-  contact_phone: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
   settings: any;
   branding: any;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SupabaseTimelineEvent {
   id: string;
-  profile_id: string;
+  profileId: string;
   type: 'education' | 'work' | 'event';
   title: string;
   description: string | null;
-  start_date: string;
-  end_date: string | null;
+  startDate: string;
+  endDate: string | null;
   location: string | null;
   institution: string | null;
   degree: string | null;
-  field_of_study: string | null;
+  fieldOfStudy: string | null;
   company: string | null;
   position: string | null;
-  media_urls: string[];
+  mediaUrls: string[];
   importance: 'high' | 'medium' | 'low';
   visibility: 'public' | 'private';
   tags: string[];
-  created_at: string;
-  updated_at: string;
-  created_by: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
 }
 
 // Profile Services
@@ -84,7 +84,7 @@ export const profileService = {
     let query = supabase
       .from('profiles')
       .select('*')
-      .eq('university_id', universityId);
+      .eq('universityId', universityId);
 
     if (options.status) {
       query = query.eq('status', options.status);
@@ -93,10 +93,10 @@ export const profileService = {
       query = query.eq('visibility', options.visibility);
     }
     if (options.search) {
-      query = query.or(`full_name.ilike.%${options.search}%,bio.ilike.%${options.search}%,department.ilike.%${options.search}%`);
+      query = query.or(`fullName.ilike.%${options.search}%,bio.ilike.%${options.search}%,department.ilike.%${options.search}%`);
     }
 
-    query = query.order('created_at', { ascending: false });
+    query = query.order('createdAt', { ascending: false });
 
     if (options.limit) {
       query = query.limit(options.limit);
@@ -162,15 +162,15 @@ export const profileService = {
     let query = supabase
       .from('profiles')
       .select('*')
-      .or(`full_name.ilike.%${searchTerm}%,bio.ilike.%${searchTerm}%,department.ilike.%${searchTerm}%`);
+      .or(`fullName.ilike.%${searchTerm}%,bio.ilike.%${searchTerm}%,department.ilike.%${searchTerm}%`);
 
     if (universityId) {
-      query = query.eq('university_id', universityId);
+      query = query.eq('universityId', universityId);
     }
 
     query = query.eq('status', 'published')
       .eq('visibility', 'public')
-      .order('created_at', { ascending: false });
+      .order('createdAt', { ascending: false });
 
     const { data, error } = await query;
     if (error) throw error;
@@ -185,7 +185,7 @@ export const universityService = {
     const { data, error } = await supabase
       .from('universities')
       .select('*')
-      .eq('is_active', true)
+      .eq('isActive', true)
       .order('name');
 
     if (error) throw error;
@@ -210,7 +210,7 @@ export const universityService = {
       .from('universities')
       .select('*')
       .eq('domain', domain)
-      .eq('is_active', true)
+      .eq('isActive', true)
       .single();
 
     if (error) throw error;
@@ -250,8 +250,8 @@ export const timelineService = {
     const { data, error } = await supabase
       .from('timeline_events')
       .select('*')
-      .eq('profile_id', profileId)
-      .order('start_date', { ascending: true });
+      .eq('profileId', profileId)
+      .order('startDate', { ascending: true });
 
     if (error) throw error;
     return data as SupabaseTimelineEvent[];
@@ -331,8 +331,8 @@ export const userService = {
     const { data, error } = await supabase
       .from('university_admins')
       .select('*')
-      .eq('user_id', userId)
-      .eq('university_id', universityId)
+      .eq('userId', userId)
+      .eq('universityId', universityId)
       .single();
 
     if (error) return false;
@@ -378,9 +378,9 @@ export const commentService = {
     const { data, error } = await supabase
       .from('comments')
       .select('*')
-      .eq('profile_id', profileId)
-      .eq('is_approved', true)
-      .order('created_at', { ascending: false });
+      .eq('profileId', profileId)
+      .eq('isApproved', true)
+      .order('createdAt', { ascending: false });
 
     if (error) throw error;
     return data;
@@ -418,7 +418,7 @@ export const supportService = {
     const { data, error } = await supabase
       .from('support_tickets')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('createdAt', { ascending: false });
 
     if (error) throw error;
     return data;
@@ -448,7 +448,7 @@ export const realtimeService = {
         event: '*',
         schema: 'public',
         table: 'profiles',
-        filter: `university_id=eq.${universityId}`
+        filter: `universityId=eq.${universityId}`
       }, callback)
       .subscribe();
   }

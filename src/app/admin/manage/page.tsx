@@ -80,7 +80,7 @@ export default function AdminManagementPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {settings?.adminEmails.map((adminEmail) => (
+            {settings?.admin_emails.map((adminEmail) => (
               <div key={adminEmail} className="flex items-center justify-between p-4 border rounded">
                 <div>
                   <div className="font-medium">{adminEmail.split('@')[0]}</div>
@@ -94,7 +94,7 @@ export default function AdminManagementPage() {
                 </Button>
               </div>
             ))}
-            {(!settings?.adminEmails || settings.adminEmails.length === 0) && (
+            {(!settings?.admin_emails || settings.admin_emails.length === 0) && (
               <div className="text-gray-500">No admins found</div>
             )}
           </div>

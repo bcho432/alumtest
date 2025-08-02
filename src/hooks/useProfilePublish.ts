@@ -78,7 +78,7 @@ export function useProfilePublish({ orgId, profileId }: UseProfilePublishProps) 
         profileId,
         timestamp: serverTimestamp(),
         metadata: {
-          publishedBy: user.uid,
+          publishedBy: user.id,
           publishedByName: user.displayName || 'Unknown',
           validationStatus: 'passed',
         },
@@ -93,7 +93,7 @@ export function useProfilePublish({ orgId, profileId }: UseProfilePublishProps) 
       trackEvent('profile_published', {
         orgId,
         profileId,
-        publishedBy: user.uid,
+        publishedBy: user.id,
       });
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to publish profile');
@@ -106,7 +106,7 @@ export function useProfilePublish({ orgId, profileId }: UseProfilePublishProps) 
         orgId,
         profileId,
         error: error.message,
-        publishedBy: user?.uid,
+        publishedBy: user?.id,
       });
       throw error;
     } finally {

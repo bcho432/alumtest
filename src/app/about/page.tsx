@@ -37,10 +37,10 @@ export default function About() {
             <div className="mx-auto max-w-2xl">
               <div className="max-w-lg">
                 <h1 className="mt-10 text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">
-                  About Memory Vista
+                  About Storiats
                 </h1>
                 <p className="mt-6 text-lg leading-8 text-gray-600">
-                  Memory Vista is a digital memorial platform dedicated to preserving and honoring the legacies of loved ones. Our mission is to create a space where memories can be shared, stories can be told, and lives can be celebrated.
+                  Storiats is a digital memorial platform dedicated to preserving and honoring the legacies of loved ones. Our mission is to create a space where memories can be shared, stories can be told, and lives can be celebrated.
                 </p>
                 <div className="mt-10 flex items-center gap-x-6">
                   <Link
@@ -120,7 +120,7 @@ export default function About() {
         <div className="mx-auto max-w-2xl lg:mx-0">
           <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Our Values</h2>
           <p className="mt-6 text-lg leading-8 text-gray-600">
-            At Memory Vista, we believe in creating meaningful digital spaces that honor and preserve the memories of loved ones. Our platform is built on these core values:
+            At Storiats, we believe in creating meaningful digital spaces that honor and preserve the memories of loved ones. Our platform is built on these core values:
           </p>
         </div>
         <dl className="mx-auto mt-16 grid max-w-2xl grid-cols-1 gap-8 text-base leading-7 text-gray-600 sm:grid-cols-2 lg:mx-0 lg:max-w-none lg:gap-x-16">
@@ -145,7 +145,7 @@ export default function About() {
             <div className="w-full flex-auto">
               <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Ready to create a lasting memorial?</h2>
               <p className="mt-6 text-lg leading-8 text-gray-600">
-                Join thousands of families who have created beautiful digital memorials with Memory Vista. Start preserving memories today.
+                Join thousands of families who have created beautiful digital memorials with Storiats. Start preserving memories today.
               </p>
               <div className="mt-10 flex items-center gap-x-6">
                 <Link

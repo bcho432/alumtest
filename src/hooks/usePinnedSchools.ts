@@ -22,7 +22,7 @@ export function usePinnedSchools(): PinnedSchoolsState & {
 
       try {
         setState(prev => ({ ...prev, isLoading: true }));
-        const schools = await pinnedSchoolsService.getPinnedSchools(user.uid);
+        const schools = await pinnedSchoolsService.getPinnedSchools(user.id);
         setState({ schools, isLoading: false, error: null });
       } catch (error) {
         console.error('Error fetching pinned schools:', error);
@@ -41,7 +41,7 @@ export function usePinnedSchools(): PinnedSchoolsState & {
     if (!user) return;
 
     try {
-      await pinnedSchoolsService.unpinSchool(user.uid, schoolId);
+      await pinnedSchoolsService.unpinSchool(user.id, schoolId);
       setState(prev => ({
         ...prev,
         schools: prev.schools.filter(school => school.orgId !== schoolId)

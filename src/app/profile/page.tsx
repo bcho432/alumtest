@@ -42,7 +42,7 @@ export default function ProfilePage() {
         .from('users')
         .update({
           display_name: displayName,
-          updated_at: new Date().toISOString()
+          updatedAt: new Date().toISOString()
         })
         .eq('id', user.id);
 

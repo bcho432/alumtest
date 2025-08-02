@@ -1,7 +1,7 @@
 {
   "name": "functions",
   "version": "1.0.0",
-  "description": "Cloud Functions for Memory Vista",
+  "description": "Cloud Functions for Storiats",
   "main": "lib/index.js",
   "scripts": {
     "build": "tsc",

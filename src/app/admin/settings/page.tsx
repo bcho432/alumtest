@@ -238,11 +238,11 @@ export default function StoriatsAdminSettingsPage() {
               <div className="space-y-4">
                 <h2 className="text-lg font-medium text-gray-900">Current Admins</h2>
                 <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
-                  {settings?.adminEmails.map((email) => (
+                  {settings?.admin_emails.map((email) => (
                     <div key={email} className="p-4 flex items-center justify-between">
                       <div className="flex-1">
                         <p className="text-sm font-medium text-gray-900">{email}</p>
-                        <p className="text-sm text-gray-500">Added by {settings.updatedBy}</p>
+                        <p className="text-sm text-gray-500">Added by {settings.updated_by}</p>
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">

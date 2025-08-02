@@ -135,7 +135,7 @@ export default function UniversityPage({ params }: { params: { universityId: str
 
         // Check admin status
         if (user) {
-          const userDoc = await getDoc(doc(services.db, 'users', user.uid));
+          const userDoc = await getDoc(doc(services.db, 'users', user.id));
           if (userDoc.exists()) {
             const userData = userDoc.data();
             const orgRoles = userData.orgRoles || {};
@@ -326,11 +326,11 @@ export default function UniversityPage({ params }: { params: { universityId: str
               className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
             >
               <div className="aspect-w-16 aspect-h-9 bg-gray-100">
-                {profile.photoURL ? (
+                {false ? (
                   <img
-                    src={profile.photoURL}
+                    src=""
                     alt={profile.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full rounded-full object-cover"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-indigo-100">

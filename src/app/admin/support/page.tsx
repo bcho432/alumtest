@@ -135,7 +135,7 @@ export default function SupportDashboard() {
       const ticketData = {
         ...newTicket,
         status: 'new' as SupportTicket['status'],
-        createdBy: user.uid,
+        createdBy: user.id,
         createdAt: Timestamp.now().toDate().toISOString(),
         updatedAt: Timestamp.now().toDate().toISOString()
       };

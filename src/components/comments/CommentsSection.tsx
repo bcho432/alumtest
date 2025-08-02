@@ -31,8 +31,8 @@ export function CommentsSection({ profileId, comments, onAddComment, className }
         const { data, error } = await supabase
           .from('comments')
           .select('*')
-          .eq('profile_id', profileId)
-          .order('created_at', { ascending: false });
+          .eq('profileId', profileId)
+          .order('createdAt', { ascending: false });
 
         if (error) {
           console.error('Error fetching comments:', error);
@@ -54,7 +54,7 @@ export function CommentsSection({ profileId, comments, onAddComment, className }
     const subscription = supabase
       .channel('comments')
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'comments', filter: `profile_id=eq.${profileId}` },
+        { event: '*', schema: 'public', table: 'comments', filter: `profileId=eq.${profileId}` },
         (payload) => {
           if (payload.eventType === 'INSERT') {
             onAddComment([payload.new as Comment, ...comments]);
@@ -81,10 +81,10 @@ export function CommentsSection({ profileId, comments, onAddComment, className }
       const { error } = await supabase
         .from('comments')
         .insert([{
-          profile_id: profileId,
+          profileId: profileId,
           content: newComment.trim(),
-          user_id: user.id,
-          user_email: user.email
+          userId: user.id,
+          userEmail: user.email
         }]);
 
       if (error) throw error;
@@ -124,7 +124,7 @@ export function CommentsSection({ profileId, comments, onAddComment, className }
         .from('comments')
         .update({ 
           content: newContent,
-          updated_at: new Date().toISOString()
+          updatedAt: new Date().toISOString()
         })
         .eq('id', commentId);
 
@@ -168,15 +168,15 @@ export function CommentsSection({ profileId, comments, onAddComment, className }
           <div key={comment.id} className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
             <div className="flex justify-between items-start mb-2">
               <div>
-                <p className="font-medium">{comment.user_email}</p>
+                <p className="font-medium">{comment.userEmail}</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {comment.created_at 
-                    ? new Date(comment.created_at).toLocaleString()
-                    : new Date(comment.created_at).toLocaleString()}
-                  {comment.is_edited && ' (edited)'}
+                  {comment.createdAt 
+                    ? new Date(comment.createdAt).toLocaleString()
+                    : new Date(comment.createdAt).toLocaleString()}
+                  {comment.isEdited && ' (edited)'}
                 </p>
               </div>
-              {(user?.id === comment.user_id || roles[profileId] === 'admin') && (
+              {(user?.id === comment.userId || roles[profileId] === 'admin') && (
                 <div className="flex gap-2">
                   <Button
                     variant="ghost"

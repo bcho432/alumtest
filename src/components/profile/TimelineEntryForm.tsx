@@ -85,8 +85,8 @@ export const TimelineEntryForm: React.FC<TimelineEntryFormProps> = ({
       const entryData = {
         profile_id: profileId,
         ...values,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
       const { data, error } = await supabase

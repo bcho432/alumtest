@@ -13,7 +13,7 @@ export const usePermissions = () => {
     try {
       setIsLoading(true);
       const dbInstance = await getDb();
-      const userDoc = await getDoc(doc(dbInstance, 'users', user.uid));
+      const userDoc = await getDoc(doc(dbInstance, 'users', user.id));
       const userData = userDoc.data();
 
       if (!userData) return false;
@@ -25,7 +25,7 @@ export const usePermissions = () => {
       if (orgId) {
         const orgDoc = await getDoc(doc(dbInstance, 'organizations', orgId));
         const orgData = orgDoc.data();
-        return orgData?.admins?.includes(user.uid) || false;
+        return orgData?.admins?.includes(user.id) || false;
       }
 
       return false;
@@ -53,7 +53,7 @@ export const usePermissions = () => {
       if (adminStatus) return true;
 
       // Check if user is in the editors list
-      return profileData.editors?.includes(user.uid) || false;
+      return profileData.editors?.includes(user.id) || false;
     } catch (error) {
       console.error('Error checking editor status:', error);
       return false;

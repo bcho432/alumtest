@@ -20,7 +20,7 @@ export const UniversityHeader = ({ university }: UniversityHeaderProps) => {
 
     try {
       setIsPinning(true);
-      await pinnedSchoolsService.pinSchool(user.uid, {
+      await pinnedSchoolsService.pinSchool(user.id, {
         orgId: university.id,
         name: university.name,
         logoUrl: university.logoUrl || ''

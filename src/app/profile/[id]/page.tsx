@@ -50,71 +50,35 @@ interface RequestToJoinButtonProps {
 }
 
 const RequestToJoinButton: React.FC<RequestToJoinButtonProps> = ({ universityId, onRequest }) => {
-  const { user } = useAuth();
-  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [isRequesting, setIsRequesting] = useState(false);
 
   const handleClick = () => {
-    if (!user) {
-      // TODO: handleAuthRequired('view');
-      return;
-    }
-
-    // TODO: Add auth required and email verification logic if needed
+    setIsRequesting(true);
     onRequest();
+    setIsRequesting(false);
   };
 
   return (
-    <>
-      <button
-        onClick={handleClick}
-        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-      >
-        <Icon name="plus" className="h-5 w-5 mr-2" />
-        Request to Join
-      </button>
-
-      {showVerificationModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-            </div>
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">
-                      Email Verification Required
-                    </h3>
-                    <div className="mt-4">
-                      <p className="text-sm text-gray-500">
-                        Please verify your email address before requesting to join this university.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button
-                  type="button"
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm"
-                  onClick={() => setShowVerificationModal(false)}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+    <button
+      onClick={handleClick}
+      disabled={isRequesting}
+      className="inline-flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full font-medium transition-colors"
+    >
+      <Icon name="users" className="h-5 w-5" />
+      {isRequesting ? 'Requesting...' : 'Request to Join'}
+    </button>
   );
 };
 
-const formatDate = (date: string | null | undefined): string => {
+const formatDate = (date: string | Date | any | null | undefined): string => {
   if (!date) return 'N/A';
   try {
+    if (date instanceof Date) {
+      return date.toLocaleDateString();
+    }
+    if (typeof date === 'object' && 'toDate' in date) {
+      return date.toDate().toLocaleDateString();
+    }
     return new Date(date).toLocaleDateString();
   } catch {
     return 'Invalid Date';
@@ -129,6 +93,8 @@ export default function ProfilePage() {
   const [university, setUniversity] = useState<University | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authAction, setAuthAction] = useState<'view' | 'edit' | 'comment'>('view');
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -154,12 +120,12 @@ export default function ProfilePage() {
 
         setProfile(profileData as ProfileData);
 
-        // Fetch university data if profile has university_id
-        if (profileData.university_id) {
+        // Fetch university data if profile has universityId
+        if (profileData.universityId) {
           const { data: universityData, error: universityError } = await supabase
             .from('universities')
             .select('*')
-            .eq('id', profileData.university_id)
+            .eq('id', profileData.universityId)
             .single();
 
           if (!universityError && universityData) {
@@ -191,8 +157,8 @@ export default function ProfilePage() {
       const { error } = await supabase
         .from('editor_requests')
         .insert([{
-          profile_id: profile.id,
-          user_id: user.id,
+          profileId: profile.id,
+          userId: user.id,
           reason: reason,
           status: 'pending'
         }]);
@@ -212,10 +178,10 @@ export default function ProfilePage() {
       const { error } = await supabase
         .from('profile_collaborators')
         .insert([{
-          profile_id: profile.id,
-          user_id: userId,
+          profileId: profile.id,
+          userId: userId,
           role: 'editor',
-          granted_at: new Date().toISOString()
+          grantedAt: new Date().toISOString()
         }]);
 
       if (error) throw error;
@@ -231,7 +197,7 @@ export default function ProfilePage() {
       const { error } = await supabase
         .from('editor_requests')
         .update({ status: 'rejected' })
-        .eq('user_id', userId);
+        .eq('userId', userId);
 
       if (error) throw error;
       toast.success('Editor request rejected');
@@ -274,19 +240,19 @@ export default function ProfilePage() {
     ...profile,
     type: 'personal' as const,
     bio: profile.bio || '',
-    photoURL: profile.photoURL || '',
-    location: profile.location || '',
-    department: profile.department || '',
-    graduationYear: profile.graduationYear || '',
-    contact: profile.contact || { email: '', phone: '', website: '' },
-    education: profile.education || [],
-    experience: profile.experience || [],
-    achievements: profile.achievements || []
-  } as PersonalProfile : undefined;
+    photoURL: '',
+    location: (profile as any).location || '',
+    department: (profile as any).department || '',
+    graduationYear: (profile as any).graduationYear || '',
+    contact: (profile as any).contact || { email: '', phone: '', website: '' },
+    education: (profile as any).education || [],
+    experience: (profile as any).experience || [],
+    achievements: (profile as any).achievements || []
+  } as unknown as PersonalProfile : undefined;
   const memorial = !isPersonalProfile ? {
     ...profile,
     type: 'memorial' as const,
-    basicInfo: profile.basicInfo || {
+    basicInfo: (profile as any).basicInfo || {
       dateOfBirth: null,
       dateOfDeath: null,
       biography: '',
@@ -294,9 +260,9 @@ export default function ProfilePage() {
       birthLocation: '',
       deathLocation: ''
     },
-    lifeStory: profile.lifeStory || { content: '', updatedAt: new Date() },
-    timeline: profile.timeline || []
-  } as MemorialProfile : undefined;
+    lifeStory: (profile as any).lifeStory || { content: '', updatedAt: new Date() },
+    timeline: (profile as any).timeline || []
+  } as unknown as MemorialProfile : undefined;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -310,13 +276,13 @@ export default function ProfilePage() {
               {isPersonalProfile ? (
                 <img
                   src={personal?.photoURL || '/default-avatar.png'}
-                  alt={profile.name}
+                  alt={profile?.name || 'Profile'}
                   className="w-full h-full object-cover rounded-xl"
                 />
               ) : memorial?.basicInfo?.photo ? (
                 <img
                   src={memorial.basicInfo.photo}
-                  alt={profile.name}
+                  alt={profile?.name || 'Profile'}
                   className="w-full h-full object-cover rounded-xl"
                 />
               ) : (
@@ -328,7 +294,7 @@ export default function ProfilePage() {
             
             {/* Profile Info */}
             <div className="flex-1 text-center md:text-left">
-              <h1 className="text-5xl font-bold mb-4">{profile.name}</h1>
+              <h1 className="text-5xl font-bold mb-4">{profile?.name || 'Profile'}</h1>
               {isPersonalProfile ? (
                 <div className="space-y-2">
                   {personal?.department && (
@@ -472,8 +438,8 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {/* Memorials Section */}
-            {memorials.length > 0 && (
+            {/* Memorials Section - TODO: Implement related memorials feature */}
+            {/* {memorials.length > 0 && (
               <div className="bg-white rounded-2xl shadow-lg p-8">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Related Memorials</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -509,7 +475,7 @@ export default function ProfilePage() {
                   ))}
                 </div>
               </div>
-            )}
+            )} */}
 
             {/* Comments Section */}
             <div className="bg-white rounded-2xl shadow-lg p-8">
@@ -550,7 +516,7 @@ export default function ProfilePage() {
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Photo Gallery</h2>
                 <MediaGallery
                   profileId={id as string}
-                  files={[profile.basicInfo.photo]}
+                  files={[(profile as any).basicInfo?.photo || '']}
                   onFileClick={(file) => window.open(file, '_blank')}
                 />
               </div>

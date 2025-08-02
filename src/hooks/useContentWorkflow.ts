@@ -97,14 +97,14 @@ export const useContentWorkflow = ({ contentId, onStatusChange }: UseContentWork
         type: 'status_change',
         from: currentStatus,
         to: newStatus,
-        by: user.uid,
+        by: user.id,
         timestamp: serverTimestamp()
       };
 
         transaction.update(contentRef, {
         status: newStatus,
         updatedAt: serverTimestamp(),
-        updatedBy: user.uid,
+        updatedBy: user.id,
         history: arrayUnion(historyEntry)
         });
       });
@@ -112,7 +112,7 @@ export const useContentWorkflow = ({ contentId, onStatusChange }: UseContentWork
       setCurrentState({
         status: newStatus,
         lastModified: new Date(),
-        lastModifiedBy: user.uid,
+        lastModifiedBy: user.id,
         pendingChanges: false
       });
 
@@ -171,7 +171,7 @@ export const useContentWorkflow = ({ contentId, onStatusChange }: UseContentWork
         type: 'change_request',
         from: currentStatus,
         to: 'draft',
-        by: user.uid,
+        by: user.id,
         reason: reason.trim(),
         timestamp: serverTimestamp()
       };
@@ -179,7 +179,7 @@ export const useContentWorkflow = ({ contentId, onStatusChange }: UseContentWork
       await updateDoc(contentRef, {
         status: 'draft',
         updatedAt: serverTimestamp(),
-        updatedBy: user.uid,
+        updatedBy: user.id,
         history: arrayUnion(historyEntry)
       });
 

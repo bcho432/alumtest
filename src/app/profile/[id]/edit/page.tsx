@@ -37,7 +37,7 @@ export default function EditProfilePage() {
         if (profileData) {
           setProfile(profileData as PersonalProfile | MemorialProfile);
           setFormData({
-            name: profileData.full_name || '',
+            name: profileData.fullName || '',
             email: profileData.contact?.email || '',
             bio: profileData.bio || '',
             location: profileData.location || ''
@@ -63,14 +63,16 @@ export default function EditProfilePage() {
 
     try {
       const updateData = {
-        full_name: formData.name,
+        fullName: formData.name,
         bio: formData.bio,
         location: formData.location,
-        contact: {
-          ...profile.contact,
-          email: formData.email
-        },
-        updated_at: new Date().toISOString()
+        ...(profile.type === 'personal' && {
+          contact: {
+            ...(profile as PersonalProfile).contact,
+            email: formData.email
+          }
+        }),
+        updatedAt: new Date().toISOString()
       };
 
       const { error } = await supabase

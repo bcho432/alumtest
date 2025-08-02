@@ -68,7 +68,7 @@ export default function Contact() {
       }
 
       // Get email recipients from admin settings
-      const recipients = adminSettings?.emailRecipients || [];
+      const recipients = adminSettings?.email_recipients || [];
       
       if (recipients.length === 0) {
         console.warn('No email recipients configured in admin settings');

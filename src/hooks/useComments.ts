@@ -45,10 +45,10 @@ export const useComments = ({ profileId, orgId }: UseCommentsProps) => {
       const commentInput: CreateCommentInput = {
         content,
         createdBy: {
-          id: user.uid,
+          id: user.id,
           name: user.displayName || 'Anonymous',
           email: user.email || '',
-          avatarUrl: user.photoURL || undefined
+          avatarUrl: undefined
         },
         parentId,
         profileId,
@@ -120,9 +120,9 @@ export const useComments = ({ profileId, orgId }: UseCommentsProps) => {
       const comment = comments.find((c) => c.id === commentId);
       if (!comment) return;
 
-      const hasReacted = comment.reactions[emoji]?.includes(user.uid);
+      const hasReacted = comment.reactions[emoji]?.includes(user.id);
       if (hasReacted) {
-        await CommentService.removeReaction(commentId, emoji, user.uid);
+        await CommentService.removeReaction(commentId, emoji, user.id);
         setComments((prev) =>
           prev.map((c) =>
             c.id === commentId
@@ -130,14 +130,14 @@ export const useComments = ({ profileId, orgId }: UseCommentsProps) => {
                   ...c,
                   reactions: {
                     ...c.reactions,
-                    [emoji]: c.reactions[emoji]?.filter((id) => id !== user.uid) || []
+                    [emoji]: c.reactions[emoji]?.filter((id) => id !== user.id) || []
                   }
                 }
               : c
           )
         );
       } else {
-        await CommentService.addReaction(commentId, emoji, user.uid);
+        await CommentService.addReaction(commentId, emoji, user.id);
         setComments((prev) =>
           prev.map((c) =>
             c.id === commentId
@@ -145,7 +145,7 @@ export const useComments = ({ profileId, orgId }: UseCommentsProps) => {
                   ...c,
                   reactions: {
                     ...c.reactions,
-                    [emoji]: [...(c.reactions[emoji] || []), user.uid]
+                    [emoji]: [...(c.reactions[emoji] || []), user.id]
                   }
                 }
               : c

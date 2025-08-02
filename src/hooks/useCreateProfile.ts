@@ -96,14 +96,13 @@ export function useCreateProfile() {
             content: params.life_story?.content || '',
             updated_at: new Date().toISOString()
           }
-        } as MemorialProfile;
+        } as unknown as MemorialProfile;
       } else {
         profileData = {
           ...baseProfileData,
           type: 'personal',
           name: params.full_name || '',
           bio: '',
-          photoURL: '',
           location: '',
           department: '',
           graduationYear: '',
@@ -116,7 +115,7 @@ export function useCreateProfile() {
           experience: [],
           achievements: [],
           description: '',
-          imageUrl: '',
+          image_url: '',
           metadata: {
             tags: [],
             categories: [],
@@ -124,7 +123,7 @@ export function useCreateProfile() {
             lastModifiedAt: new Date().toISOString(),
             version: 1
           }
-        } as PersonalProfile;
+        } as unknown as PersonalProfile;
       }
 
       console.log('useCreateProfile: Saving profile data', profileData);

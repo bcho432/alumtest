@@ -19,7 +19,7 @@ export function FeaturedUniversities() {
         const { data: universitiesList, error } = await supabase
           .from('universities')
           .select('*')
-          .eq('is_featured', true);
+          .limit(5); // Show first 5 universities instead of filtering by is_featured
 
         if (error) {
           console.error('Error loading featured universities:', error);

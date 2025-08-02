@@ -64,10 +64,10 @@ export default function TestDBPage() {
         try {
           const profile = await userService.updateUserProfile(user.id, {
             email: user.email,
-            display_name: user.email?.split('@')[0] || 'Test User',
-            email_verified: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            displayName: user.email?.split('@')[0] || 'Test User',
+            emailVerified: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
           });
           setMessage(`User profile created: ${JSON.stringify(profile, null, 2)}`);
         } catch (error) {

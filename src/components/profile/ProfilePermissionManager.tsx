@@ -115,7 +115,7 @@ export default function ProfilePermissionManager({ universityId }: ProfilePermis
           ...prev,
           [pendingAction.userId]: {
             role: pendingAction.role!,
-            grantedBy: user.uid,
+            grantedBy: user.id,
             grantedAt: new Date()
           }
         }));

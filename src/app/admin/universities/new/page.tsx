@@ -61,7 +61,7 @@ export default function NewUniversityPage() {
 
       const universityId = await universitiesService.createUniversity({
         name: formData.name,
-        createdBy: user.uid,
+        createdBy: user.id,
         admins: [adminId],
         isActive: true
       });

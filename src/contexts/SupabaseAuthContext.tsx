@@ -113,9 +113,9 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
             email: user.email,
             display_name: user.user_metadata?.full_name || user.email?.split('@')[0],
             email_verified: user.email_confirmed_at ? true : false,
-            photo_url: user.user_metadata?.avatar_url,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            photo_url: undefined,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
           });
           
           console.log('[Supabase Auth Context] Created user profile:', newProfile);
@@ -165,10 +165,7 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         console.log('[Supabase Auth Context] Setting user directly after sign in:', authData.user);
         setUser(authData.user);
         await loadUserData(authData.user);
-        toast({
-          title: 'Success',
-          description: 'Signed in successfully',
-        });
+        toast('Signed in successfully', 'success');
       } else {
         throw new Error('No user data received after sign in');
       }
@@ -189,11 +186,7 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      toast(errorMessage, 'error');
 
       return { success: false, error: errorMessage };
     } finally {
@@ -210,10 +203,7 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       
       // Note: authData.user might be null if email confirmation is required
       // We'll create the user profile when they first sign in after confirming email
-      toast({
-        title: 'Success',
-        description: 'Account created successfully! Please check your email to confirm your account.',
-      });
+      toast('Account created successfully! Please check your email to confirm your account.', 'success');
 
       return { success: true };
     } catch (error) {
@@ -231,11 +221,7 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      toast(errorMessage, 'error');
 
       return { success: false, error: errorMessage };
     } finally {
@@ -257,21 +243,14 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         error: null
       });
       
-      toast({
-        title: 'Success',
-        description: 'Signed out successfully',
-      });
+      toast('Signed out successfully', 'success');
       
       router.push('/auth/login');
     } catch (error) {
       console.error('[Supabase Auth Context] Sign out error:', error);
       setLastError(error as Error);
       
-      toast({
-        title: 'Error',
-        description: 'Failed to sign out',
-        variant: 'destructive',
-      });
+      toast('Error signing out', 'error');
     }
   };
 
@@ -283,21 +262,14 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
 
       if (error) throw error;
 
-      toast({
-        title: 'Success',
-        description: 'Password reset email sent. Please check your inbox.',
-      });
+      toast('Password reset email sent. Please check your inbox.', 'success');
 
       return { success: true };
     } catch (error) {
       console.error('[Supabase Auth Context] Reset password error:', error);
       setLastError(error as Error);
       
-      toast({
-        title: 'Error',
-        description: 'Failed to send reset email',
-        variant: 'destructive',
-      });
+      toast('Error sending password reset email', 'error');
 
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
@@ -311,21 +283,14 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
 
       if (error) throw error;
 
-      toast({
-        title: 'Success',
-        description: 'Password updated successfully',
-      });
+      toast('Password updated successfully', 'success');
 
       return { success: true };
     } catch (error) {
       console.error('[Supabase Auth Context] Update password error:', error);
       setLastError(error as Error);
       
-      toast({
-        title: 'Error',
-        description: 'Failed to update password',
-        variant: 'destructive',
-      });
+      toast('Error updating password', 'error');
 
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
@@ -339,21 +304,14 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
 
       if (error) throw error;
 
-      toast({
-        title: 'Success',
-        description: 'Email update request sent. Please check your email to confirm.',
-      });
+      toast('Email update request sent. Please check your email to confirm.', 'success');
 
       return { success: true };
     } catch (error) {
       console.error('[Supabase Auth Context] Update email error:', error);
       setLastError(error as Error);
       
-      toast({
-        title: 'Error',
-        description: 'Failed to update email',
-        variant: 'destructive',
-      });
+      toast('Error updating email', 'error');
 
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
@@ -366,26 +324,19 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       const { error } = await userService.updateUserProfile(user.id, {
         display_name: data.displayName,
         photo_url: data.photoURL,
-        updated_at: new Date().toISOString()
+        updatedAt: new Date().toISOString()
       });
 
       if (error) throw error;
 
-      toast({
-        title: 'Success',
-        description: 'Profile updated successfully',
-      });
+      toast('Profile updated successfully', 'success');
 
       return { success: true };
     } catch (error) {
       console.error('[Supabase Auth Context] Update profile error:', error);
       setLastError(error as Error);
       
-      toast({
-        title: 'Error',
-        description: 'Failed to update profile',
-        variant: 'destructive',
-      });
+      toast('Error updating profile', 'error');
 
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }

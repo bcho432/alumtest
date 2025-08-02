@@ -110,7 +110,7 @@ const validateDates = (birthDate: Date | string | null, deathDate: Date | string
 
 export function EnhancedProfileForm({ universityId, profileId, onSuccess }: EnhancedProfileFormProps) {
   const { user } = useAuth();
-  const { hasPermission } = usePermissions();
+  const { isAdmin, isEditor, canPublish, isLoading } = usePermissions();
   const { toast } = useToast();
   const params = useParams();
   const [activeTab, setActiveTab] = useState<TabId>('basic');
@@ -119,6 +119,10 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
   const [uploading, setUploading] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'draft' | 'published'>('draft');
+  const [fieldErrors, setFieldErrors] = useState<{
+    dateOfBirth?: string;
+    dateOfDeath?: string;
+  }>({});
   const [formData, setFormData] = useState<ProfileFormData>({
     full_name: '',
     type: 'personal',
@@ -178,7 +182,7 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
           },
           life_story: {
             content: profileData.life_story?.content || '',
-            updated_at: profileData.life_story?.updated_at || new Date().toISOString()
+            updated_at: profileData.life_story?.updatedAt || new Date().toISOString()
           },
           status: profileData.status || 'draft',
           is_public: profileData.is_public || false,
@@ -269,12 +273,13 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
     }
   };
 
-  const handleDateChange = (field: 'date_of_birth' | 'date_of_death', value: Date | undefined) => {
+  const handleDateChange = (field: 'dateOfBirth' | 'dateOfDeath', value: Date | undefined) => {
+    const snakeCaseField = field === 'dateOfBirth' ? 'date_of_birth' : 'date_of_death';
     setFormData(prev => ({
       ...prev,
       basic_info: {
         ...prev.basic_info,
-        [field]: value ? value.toISOString() : null
+        [snakeCaseField]: value ? value.toISOString() : null
       }
     }));
   };
@@ -388,7 +393,21 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
         >
           {activeTab === 'basic' && (
             <BasicInfoTab
-              formData={formData}
+              formData={{
+                name: formData.full_name,
+                type: formData.type,
+                basicInfo: {
+                  dateOfBirth: typeof formData.basic_info.date_of_birth === 'string' 
+                    ? new Date(formData.basic_info.date_of_birth) 
+                    : formData.basic_info.date_of_birth,
+                  dateOfDeath: typeof formData.basic_info.date_of_death === 'string' 
+                    ? new Date(formData.basic_info.date_of_death) 
+                    : formData.basic_info.date_of_death,
+                  birthLocation: formData.basic_info.birth_location,
+                  deathLocation: formData.basic_info.death_location,
+                  photo: formData.basic_info.photo
+                }
+              }}
               onInputChange={handleInputChange}
               onDateChange={handleDateChange}
               onFileUpload={handleFileUpload}
@@ -399,14 +418,20 @@ export function EnhancedProfileForm({ universityId, profileId, onSuccess }: Enha
 
           {activeTab === 'biography' && (
             <BiographyTab
-              formData={formData}
+              formData={{
+                ...formData,
+                basicInfo: { biography: formData.basic_info.biography || '' }
+              }}
               onInputChange={handleInputChange}
             />
           )}
 
           {activeTab === 'lifeStory' && (
             <LifeStoryTab
-              formData={formData}
+              formData={{
+                ...formData,
+                lifeStory: { content: formData.life_story.content || '', updatedAt: new Date() }
+              }}
               onInputChange={handleInputChange}
             />
           )}
