@@ -18,13 +18,11 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
-    "baseUrl": ".",
+    "baseUrl": "src",
     "paths": {
-      "@/*": [
-        "./src/*"
-      ],
+      "@/*": ["*"],
       "@memory-vista/*": [
-        "./memory-vista/src/*"
+        "../memory-vista/src/*"
       ]
     },
     "types": [
