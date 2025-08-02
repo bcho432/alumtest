@@ -1,4 +1,5 @@
 import React from 'react';
+import { toast } from 'react-hot-toast';
 
 interface ToastProps {
   message: string;
@@ -8,8 +9,22 @@ interface ToastProps {
   onClose?: () => void;
 }
 
-export const showToast = jest.fn();
-export const hideToast = jest.fn();
+export const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
+  switch (type) {
+    case 'success':
+      return toast.success(message);
+    case 'error':
+      return toast.error(message);
+    case 'warning':
+      return toast(message, { icon: '⚠️' });
+    default:
+      return toast(message);
+  }
+};
+
+export const hideToast = () => {
+  toast.dismiss();
+};
 
 const Toast: React.FC<ToastProps> = ({ message, type = 'info', position = 'bottom-right', duration = 3000, onClose }) => {
   return (
